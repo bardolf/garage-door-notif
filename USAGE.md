@@ -136,6 +136,10 @@ Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. 
 - **10–60°** = pootevřeno (normálně by se to nemělo stávat, ale není to alert)
 - **>60°** = otevřeno (alert v noci!)
 
+### Čas ve zprávách
+
+Čas v notifikacích (`Cas: HH:MM`) **nemusí vždy přesně odpovídat skutečnému času** — může být odchýlený o pár minut. Zařízení nemá hodinový krystal pro přesné měření času; používá interní oscilátor a pravidelně si čas synchronizuje přes internet (každých ~10 minut). Pro účely hlídání nočního okna 22:00–06:00 je to dostatečně přesné, drobné odchýlky neovlivňují funkci.
+
 ---
 
 ## Co dělat když...
