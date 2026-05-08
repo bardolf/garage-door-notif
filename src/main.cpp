@@ -47,7 +47,7 @@
 static const uint32_t WAKE_INTERVAL_S        = 300;     // 5 min
 static const float    TILT_THRESHOLD_OPEN    = 60.0f;   // dle README.md (sekce Architektura)
 static const float    TILT_THRESHOLD_CLOSE   = 40.0f;   // hystereze
-static const int      NIGHT_START_HOUR       = 13;
+static const int      NIGHT_START_HOUR       = 22;
 static const int      NIGHT_END_HOUR         = 6;
 static const int      HEARTBEAT_HOUR         = 21;
 // Cilove chovani: alert pri kazdem wake cyklu, pokud jsou vrata otevrena v nocnim okne.
@@ -60,9 +60,10 @@ static const uint32_t ERROR_REPORT_RATE_LIMIT_S = 4 * 60;
 // NTP forced refresh: kdyz uz nesyncovalo dyl nez 24 h, je to povinne (drift safety net).
 static const uint32_t NTP_RESYNC_INTERVAL_S         = 24 * 3600;
 // NTP opportunistic refresh: pokud uz mame WiFi z jineho duvodu (alert/heartbeat/error),
-// syncneme zadarmo, pokud poslední sync byl pred vic nez timto cisem. Brani spamu NTP
-// serveru pri castych alertech (kazdych 5 min by jinak byl sync).
-static const uint32_t NTP_OPPORTUNISTIC_INTERVAL_S  = 3600;     // 1 h
+// syncneme zadarmo, pokud poslední sync byl pred vic nez timto cisem. FireBeetle ESP32-E
+// pouziva interni RC oscilator pro RTC_SLOW_CLK (ne 32 kHz krystal) → drift 2–5 % =
+// 5–15 s na 5min wake cyklus. Threshold 10 min limituje drift na ~30 s mezi syncy.
+static const uint32_t NTP_OPPORTUNISTIC_INTERVAL_S  = 600;      // 10 min
 static const uint32_t WIFI_TIMEOUT_MS               = 15000;
 static const uint32_t NTP_TIMEOUT_MS                = 10000;
 
@@ -85,7 +86,14 @@ static const float   ACCEL_LSB_PER_G  = 16384.0f;
 // ===== Persistovany stav (RTC slow memory) =====
 struct Vec3 { float x, y, z; };
 
+// Magic sentinel — overuje ze RTC mem byla inicializovana cold-boot rutinou.
+// Pri brownout / WDT reset RTC mem se zachovat, ale `esp_sleep_get_wakeup_cause()`
+// vraci UNDEFINED (jako pri cold boot). Bez sentinelu bychom prepisovali platnou
+// state baseline. Magic = libovolny "unlikely random" 32-bit pattern.
+static const uint32_t STATE_MAGIC = 0xC0FFEE42;
+
 RTC_DATA_ATTR struct {
+  uint32_t magic;                     // STATE_MAGIC pokud je state platny
   uint32_t boot_count;
   uint64_t last_alert_unix;
   int      last_heartbeat_yday;       // -1 = nikdy
@@ -99,6 +107,13 @@ RTC_DATA_ATTR struct {
   uint64_t last_error_report_unix;
   char     pending_error_msg[96];     // posledni typ chyby (lidsky citelny)
 } state;
+
+// Bezpecny rate-limit check — pokud cas selne (clock walked back po NTP correction),
+// signed elapsed vyjde negativne, nikoli unsigned wrap. Conservative — drzi limit.
+static bool elapsed_at_least(uint64_t now, uint64_t since, uint32_t threshold_s) {
+  int64_t elapsed = (int64_t)now - (int64_t)since;
+  return elapsed >= (int64_t)threshold_s;
+}
 
 // ===== Helpers — baterka =====
 
@@ -199,8 +214,10 @@ static float vec_mag(const Vec3 &v) {
 // 3D uhel mezi dvema accel vektory (v stupnich).
 static float angle_deg(const Vec3 &a, const Vec3 &b) {
   float ma = vec_mag(a), mb = vec_mag(b);
-  if (ma < 1e-6f || mb < 1e-6f) return 0;
+  // NaN guard — pokud je RTC mem corrupted (NaN baseline), netekej dale do acosf.
+  if (isnan(ma) || isnan(mb) || ma < 1e-6f || mb < 1e-6f) return 0;
   float c = (a.x*b.x + a.y*b.y + a.z*b.z) / (ma * mb);
+  if (isnan(c)) return 0;
   if (c > 1.0f)  c = 1.0f;
   if (c < -1.0f) c = -1.0f;
   return acosf(c) * 180.0f / (float)PI;
@@ -271,7 +288,7 @@ static bool ntfy_send(const char* title, const char* body,
   int code = http.POST((uint8_t*)body, strlen(body));
   http.end();
   Serial.printf("[ntfy] '%s' -> HTTP %d\n", title, code);
-  return code == 200;
+  return code >= 200 && code < 300;  // accept all 2xx (ntfy obvykle vraci 200, ale 202 je taky valid)
 }
 
 // ===== Time helpers =====
@@ -370,7 +387,7 @@ static void queue_error(const char* msg) {
 static void flush_pending_errors(float vbat_pct, int rssi) {
   if (state.pending_error_count == 0) return;
 
-  char timestr[32] = "(cas nezname)";
+  char timestr[32] = "(cas neznamy)";
   if (time_is_synced()) format_time(timestr, sizeof(timestr), "%H:%M");
 
   // Reassurance text — pomáhá uživateli rozhodnout jestli má panikařit.
@@ -418,6 +435,7 @@ static void enter_deep_sleep() {
 
 static void do_cold_boot() {
   Serial.println(F("=== COLD BOOT ==="));
+  state.magic                  = STATE_MAGIC;       // mark RTC mem as initialized
   state.boot_count             = 1;
   state.last_alert_unix        = 0;
   state.last_heartbeat_yday    = -1;
@@ -516,7 +534,7 @@ static void do_wake_cycle() {
     if (!measure_ok) {
       if (!wake_ever_ok) {
         Serial.printf("[mpu] wake selhal po %u pokusech\n", MPU_RETRY_COUNT);
-        queue_error("MPU sensor neodpovida (wake selhal po 3 pokusech)");
+        queue_error("MPU sensor neodpovida (probuzeni selhalo po 3 pokusech)");
       } else {
         Serial.printf("[mpu] measure selhal po %u pokusech\n", MPU_RETRY_COUNT);
         queue_error("MPU mereni selhalo (po 3 pokusech)");
@@ -546,21 +564,20 @@ static void do_wake_cycle() {
   bool need_error_report = false;
 
   if (time_is_synced()) {
+    time_t now; time(&now);
     if (measure_ok && door_open && is_night_window()) {
-      time_t now; time(&now);
-      if ((uint64_t)now - state.last_alert_unix >= ALERT_RATE_LIMIT_S) {
+      if (elapsed_at_least((uint64_t)now, state.last_alert_unix, ALERT_RATE_LIMIT_S)) {
         need_alert = true;
       } else {
-        Serial.printf("[rate] alert suppressed (last %llu s ago)\n",
-                      (unsigned long long)((uint64_t)now - state.last_alert_unix));
+        int64_t since = (int64_t)now - (int64_t)state.last_alert_unix;
+        Serial.printf("[rate] alert suppressed (last %lld s ago)\n", (long long)since);
       }
     }
     int yday = current_yday();
     if (current_hour() == HEARTBEAT_HOUR && state.last_heartbeat_yday != yday) {
       need_heartbeat = true;
     }
-    time_t now; time(&now);
-    if ((uint64_t)now - state.last_ntp_unix > NTP_RESYNC_INTERVAL_S) {
+    if (elapsed_at_least((uint64_t)now, state.last_ntp_unix, NTP_RESYNC_INTERVAL_S)) {
       need_ntp = true;
     }
   } else {
@@ -576,7 +593,7 @@ static void do_wake_cycle() {
       need_error_report = (need_alert || need_heartbeat || need_ntp);
     } else {
       time_t now; time(&now);
-      if ((uint64_t)now - state.last_error_report_unix >= ERROR_REPORT_RATE_LIMIT_S) {
+      if (elapsed_at_least((uint64_t)now, state.last_error_report_unix, ERROR_REPORT_RATE_LIMIT_S)) {
         need_error_report = true;
       }
     }
@@ -604,14 +621,15 @@ static void do_wake_cycle() {
       // Zarucuje cas pravidelne aktualizovan i bez forced 24h refreshe, ale
       // nezatezuje NTP servery pri castych alertech (kazdych 5 min).
       time_t now_unix; time(&now_unix);
-      uint64_t elapsed_since_ntp = (uint64_t)now_unix - state.last_ntp_unix;
       bool ntp_stale = !time_is_synced() ||
-                       (elapsed_since_ntp >= NTP_OPPORTUNISTIC_INTERVAL_S);
+                       elapsed_at_least((uint64_t)now_unix, state.last_ntp_unix,
+                                        NTP_OPPORTUNISTIC_INTERVAL_S);
       if (ntp_stale) {
         ntp_sync();
       } else {
-        Serial.printf("[ntp] sync skipped (last %llu s ago, threshold %lu s)\n",
-                      (unsigned long long)elapsed_since_ntp,
+        int64_t since = (int64_t)now_unix - (int64_t)state.last_ntp_unix;
+        Serial.printf("[ntp] sync skipped (last %lld s ago, threshold %lu s)\n",
+                      (long long)since,
                       (unsigned long)NTP_OPPORTUNISTIC_INTERVAL_S);
       }
 
@@ -655,12 +673,22 @@ void setup() {
   setenv("TZ", TZ_CZ, 1);
   tzset();
 
+  // Cold-boot detekce robustne — kombinace wake cause + RTC mem magic sentinel.
+  // - cause == TIMER + magic OK → normalni wake z deep sleep
+  // - cause != TIMER + magic OK → unexpected reset (brownout, WDT, RST), ale state
+  //   v RTC mem je validni → continue jako wake (zachovat baseline)
+  // - magic NOT ok → opravdu prvni cold boot (power on / EN reset / WDT s power-off)
   esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-  bool cold_boot = (cause == ESP_SLEEP_WAKEUP_UNDEFINED);
+  bool magic_valid = (state.magic == STATE_MAGIC);
+  bool true_cold_boot = !magic_valid;
 
-  if (cold_boot) {
+  if (true_cold_boot) {
     do_cold_boot();
   } else {
+    if (cause != ESP_SLEEP_WAKEUP_TIMER) {
+      Serial.printf("[boot] unexpected reset cause=%d, RTC mem valid → continuing as wake\n",
+                    (int)cause);
+    }
     do_wake_cycle();
   }
 

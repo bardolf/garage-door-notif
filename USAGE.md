@@ -96,7 +96,7 @@ Signal: dobry (-67 dBm)
 - Stiskněte RST tlačítko na zařízení — pokud problém zmizí, byl to dočasný glitch
 - Pokud chyby pokračují, sensor je pravděpodobně mrtvý → výměna MPU6050 modulu
 
-**Důležité:** pokud chodí chyby, **alerty na otevřená vrata nemusí fungovat**. Zařízení nedokáže měřit náklon, takže by neviděl ani skutečně otevřená vrata. **Berte chybové zprávy vážně.**
+**Důležité:** pokud chodí chyby, **alerty na otevřená vrata nemusí fungovat**. Zařízení nedokáže měřit náklon, takže by nevidělo ani skutečně otevřená vrata. **Berte chybové zprávy vážně.**
 
 ---
 
@@ -133,7 +133,7 @@ Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. 
 `Naklon: X°` — o kolik se vrata pohnula od původní polohy (zachycené při startu).
 
 - **0–10°** = zavřeno (drobné chvění z větru, vibrací)
-- **10–60°** = pootevřeno (normálně se nemělo by stávat, ale není to alert)
+- **10–60°** = pootevřeno (normálně by se to nemělo stávat, ale není to alert)
 - **>60°** = otevřeno (alert v noci!)
 
 ---
@@ -144,7 +144,7 @@ Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. 
 
 1. **Zkontrolujte vrata** — fyzicky, kamerou, požádejte souseda
 2. Pokud je to **planý poplach** (např. silný vítr roztřásl vrata):
-   - Žádný akce není nutná, zařízení samo zase zaregistruje „zavřeno" jakmile se náklon vrátí
+   - Žádná akce není nutná, zařízení samo zase zaregistruje „zavřeno" jakmile se náklon vrátí
    - Pokud vítr nadále působí, dostanete další alert do 5 minut (cyklicky až do uklidnění)
 3. Pokud někdo vrata reálně otevřel (zloděj, zapomenuté otevření): jednejte podle situace
 
@@ -161,7 +161,7 @@ Možnosti, od nejpravděpodobnější:
 4. **Hardware selhal** — ESP nebo MPU vypovědělo službu
 
 **Co udělat:** počkejte do dalšího dne. Pokud druhý den znova nepřišel, otevřete garáž a zkontrolujte:
-- Svítí na zařízení nějaká LED? (zelená na senzoru by měla… kdyžtak ne, máme ji odpájenou pro úsporu)
+- Svítí na zařízení nějaká LED? (zelenou na senzoru jsme odpájeli pro úsporu energie, takže nesvítí)
 - Je baterie nabitá? (zkuste nabít přes USB-C kabel)
 - Jsou všechny kabely zapojené?
 
@@ -182,12 +182,12 @@ Naplánujte nabití do týdne. Při kritickém stavu (<5 %) se zařízení samo 
 Zařízení má **vestavěný USB-C konektor + nabíjecí čip TP4056**. Nabíjení:
 
 1. Připojte USB-C kabel do zařízení
-2. Druhý konec do jakéhokoliv USB nabíječe (telefon nabíječka, powerbanka, PC, …)
+2. Druhý konec do jakéhokoliv USB nabíječe (telefonní nabíječka, powerbanka, PC, …)
 3. Červená LED na zařízení svítí během nabíjení
 4. LED zhasne když je baterka plně nabitá (~2–3 hodiny pro 1000 mAh, ~6 h pro 18650)
 5. Zařízení **může běžet i během nabíjení**, není třeba vypínat
 
-**Důležité:** zařízení se po výměně/odpojení baterky chová jako po prvním zapnutí — pošle „Garaz spustena" notifikaci a znovu zachytí baseline (předpokládá vrata zavřená).
+**Důležité:** zařízení se po výměně/odpojení baterky chová jako po prvním zapnutí — pošle „Hlidac garazovych vrat aktivni" notifikaci a znovu zachytí baseline (předpokládá vrata zavřená).
 
 ➜ **Nabíjejte tedy se zavřenými vraty**, jinak bude baseline špatně.
 
@@ -201,16 +201,16 @@ A: Vyhodnoťte jednou. Pokud se opakuje, zařízení může mít posunutý basel
 **Q: Funguje to bez WiFi?**
 A: Ne. Zařízení potřebuje WiFi pro odeslání notifikace přes ntfy.sh. Bez WiFi neudělá nic užitečného (žádný lokální alert / siréna).
 
-**Q: Jak nastavit které vrata má hlídat?**
+**Q: Jak nastavit, která vrata má zařízení hlídat?**
 A: Senzor musí být **pevně přilepený k vratům** (ne na rámu, na pohyblivé části). Při zapnutí se zachytí aktuální poloha jako „zavřeno". Pak když se vrata pohnou >60°, alert.
 
 **Q: Funguje to na sekční / rolovací / křídlová vrata?**
-A: Ano, na všechna která se naklánějí o víc než 60° při otevření. Sekční (skládací do stropu) typicky 90°, křídlová 90°, rolovací (svisle navíjená) jen ~5–10° — **na rolovací nefunguje**, je třeba jiný senzor.
+A: Ano, na všechna, která se naklánějí o víc než 60° při otevření. Sekční (skládací do stropu) typicky 90°, křídlová 90°, rolovací (svisle navíjená) jen ~5–10° — **na rolovací nefunguje**, je třeba jiný senzor.
 
 **Q: Lze zařízení rozšířit o detekci přes den?**
 A: Aktuálně hlídá jen 22:00–06:00. Rozšíření by šlo, ale baterie vydrží míň (víc alertů = víc WiFi = víc energie). Pokud potřeba, dá se firmware upravit.
 
-**Q: Co když Já chci notifikaci vypnout (např. legitimně otevírám vrata v noci)?**
+**Q: Co když chci notifikaci vypnout (např. legitimně otevírám vrata v noci)?**
 A: Buď vypněte ntfy.sh appku v telefonu před tím, nebo akceptujte alert (přijde každých ~5 min dokud vrata nezavřete). Plánovaný „suppress" mód není.
 
 ---
