@@ -8,13 +8,14 @@
 //     4. ESP+MPU sleep, deep sleep WAKE_INTERVAL_S sekund
 //
 //   WAKE (z deep sleep, kazdych 5 min):
-//     1. Wake MPU pres I2C, mereni tilt vs baseline
+//     1. Wake MPU pres I2C, mereni tilt vs baseline (3 retry pokusy proti glitchum)
 //     2. Hystereze: open >60°, close <40° (drzime stav v RTC mem)
 //     3. Logika podle casu:
-//        - 22:00-06:00 + tilt open + nebyl alert v >30 min → URGENT alert
+//        - 22:00-06:00 + tilt open + nebyl alert v >4 min → URGENT alert
 //        - 21:00 hodina + heartbeat dnes jeste neodeslan → daily heartbeat
-//        - posledni NTP sync >24h → opportunistic refresh
-//     4. Pokud potrebujeme WiFi (alert/heartbeat/NTP), pripojime se a posleme
+//        - posledni NTP sync >24h → forced refresh
+//        - MPU error queue ma chyby + rate limit OK → error report
+//     4. Pokud potrebujeme WiFi: connect → opportunistic NTP (1h threshold) → poslat
 //     5. ESP+MPU sleep, deep sleep WAKE_INTERVAL_S sekund
 //
 // State persistence pres deep sleep — RTC slow memory (RTC_DATA_ATTR):
@@ -56,9 +57,19 @@ static const uint32_t ALERT_RATE_LIMIT_S        = 4 * 60;
 // Stejny princip pro error reporty — kdyz je MPU broken, user dostane upozorneni
 // pri kazdem wake (= cca kazdych 5 min) dokud problem nezmizi.
 static const uint32_t ERROR_REPORT_RATE_LIMIT_S = 4 * 60;
-static const uint32_t NTP_RESYNC_INTERVAL_S  = 24 * 3600;
-static const uint32_t WIFI_TIMEOUT_MS        = 15000;
-static const uint32_t NTP_TIMEOUT_MS         = 10000;
+// NTP forced refresh: kdyz uz nesyncovalo dyl nez 24 h, je to povinne (drift safety net).
+static const uint32_t NTP_RESYNC_INTERVAL_S         = 24 * 3600;
+// NTP opportunistic refresh: pokud uz mame WiFi z jineho duvodu (alert/heartbeat/error),
+// syncneme zadarmo, pokud poslední sync byl pred vic nez timto cisem. Brani spamu NTP
+// serveru pri castych alertech (kazdych 5 min by jinak byl sync).
+static const uint32_t NTP_OPPORTUNISTIC_INTERVAL_S  = 3600;     // 1 h
+static const uint32_t WIFI_TIMEOUT_MS               = 15000;
+static const uint32_t NTP_TIMEOUT_MS                = 10000;
+
+// MPU retry: I2C glitch / dotcasna nestabilita -> pokus znova nez ohlasime chybu.
+// Total: MPU_RETRY_COUNT pokusu (1 + N-1 retry) s MPU_RETRY_DELAY_MS mezi nimi.
+static const uint8_t  MPU_RETRY_COUNT      = 3;
+static const uint16_t MPU_RETRY_DELAY_MS   = 100;
 
 // CZ timezone — automaticky resi CET/CEST DST
 static const char* TZ_CZ = "CET-1CEST,M3.5.0,M10.5.0/3";
@@ -362,15 +373,28 @@ static void flush_pending_errors(float vbat_pct, int rssi) {
   char timestr[32] = "(cas nezname)";
   if (time_is_synced()) format_time(timestr, sizeof(timestr), "%H:%M");
 
-  char body[256];
+  // Reassurance text — pomáhá uživateli rozhodnout jestli má panikařit.
+  // Jednorazova chyba (i po retry) muze byt napajeci spike, mechanicky otres,
+  // dotcasna instabilita kabelu. Opakovane chyby = realny problem (kabel,
+  // sensor mrtvy, baterka pod limitem napajeni MPU).
+  const char* reassurance = (state.pending_error_count == 1)
+    ? "Jednorazova chyba je obvykle OK (I2C glitch, vibrace).\n"
+      "Pokud chyba pokracuje v dalsich kontrolach, zkontroluj kabely / sensor."
+    : "Chyby se opakuji - pravdepodobne realny problem.\n"
+      "Zkontroluj zapojeni MPU (4 draty), pripadne vymen sensor.";
+
+  char body[384];
   snprintf(body, sizeof(body),
     "Cas: %s\n"
     "Pocet chyb od posledniho hlaseni: %u\n"
     "Posledni: %s\n"
     "Baterka: %.0f %%\n"
-    "Signal: %s (%d dBm)",
+    "Signal: %s (%d dBm)\n"
+    "\n"
+    "%s",
     timestr, state.pending_error_count, state.pending_error_msg,
-    vbat_pct, rssi_label(rssi), rssi);
+    vbat_pct, rssi_label(rssi), rssi,
+    reassurance);
 
   if (ntfy_send("Hlidac vrat - CHYBA", body, "high", "warning")) {
     state.pending_error_count = 0;
@@ -461,17 +485,45 @@ static void do_wake_cycle() {
   } else {
     Wire.begin(SDA_PIN, SCL_PIN);
     Wire.setClock(400000);
-    if (!mpu_wake_chip()) {
-      Serial.println(F("[mpu] wake fail"));
-      queue_error("MPU sensor neodpovida (wake selhal)");
-    } else {
-      measure_ok = mpu_measure_avg(6, a);
-      if (!measure_ok) {
-        Serial.println(F("[mpu] measure fail"));
-        queue_error("MPU mereni selhalo (sensor nereaguje stabilne)");
+
+    // Retry smyčka: sensor občas vrátí chybu z důvodu I²C glitche, pokus znova.
+    bool wake_ever_ok = false;
+    for (uint8_t attempt = 1; attempt <= MPU_RETRY_COUNT; attempt++) {
+      if (!mpu_wake_chip()) {
+        if (attempt < MPU_RETRY_COUNT) {
+          Serial.printf("[mpu] wake fail, retry %u/%u za %u ms\n",
+                        attempt, MPU_RETRY_COUNT - 1, MPU_RETRY_DELAY_MS);
+          delay(MPU_RETRY_DELAY_MS);
+        }
+        continue;
       }
-      mpu_sleep_chip();
+      wake_ever_ok = true;
+      if (mpu_measure_avg(6, a)) {
+        measure_ok = true;
+        if (attempt > 1) {
+          Serial.printf("[mpu] OK po %u. pokusu\n", attempt);
+        }
+        break;
+      }
+      // Wake prošel, ale measure failed → další pokus (může být dočasná instabilita)
+      if (attempt < MPU_RETRY_COUNT) {
+        Serial.printf("[mpu] measure fail, retry %u/%u za %u ms\n",
+                      attempt, MPU_RETRY_COUNT - 1, MPU_RETRY_DELAY_MS);
+        delay(MPU_RETRY_DELAY_MS);
+      }
     }
+
+    if (!measure_ok) {
+      if (!wake_ever_ok) {
+        Serial.printf("[mpu] wake selhal po %u pokusech\n", MPU_RETRY_COUNT);
+        queue_error("MPU sensor neodpovida (wake selhal po 3 pokusech)");
+      } else {
+        Serial.printf("[mpu] measure selhal po %u pokusech\n", MPU_RETRY_COUNT);
+        queue_error("MPU mereni selhalo (po 3 pokusech)");
+      }
+    }
+    // Best effort — pokud wake někdy prošel, MPU je v active modu, vrátit do sleep.
+    if (wake_ever_ok) mpu_sleep_chip();
   }
 
   // 2. Tilt + hystereze (jen pokud mereni proslo)
@@ -548,7 +600,20 @@ static void do_wake_cycle() {
   // 4. WiFi connect a posli vse najednou
   if (need_alert || need_heartbeat || need_ntp || need_error_report) {
     if (wifi_connect()) {
-      ntp_sync();  // opportunistic, zadarmo kdyz uz mame WiFi
+      // Opportunistic NTP — sync jen pokud uplynul rozumny cas od posledniho.
+      // Zarucuje cas pravidelne aktualizovan i bez forced 24h refreshe, ale
+      // nezatezuje NTP servery pri castych alertech (kazdych 5 min).
+      time_t now_unix; time(&now_unix);
+      uint64_t elapsed_since_ntp = (uint64_t)now_unix - state.last_ntp_unix;
+      bool ntp_stale = !time_is_synced() ||
+                       (elapsed_since_ntp >= NTP_OPPORTUNISTIC_INTERVAL_S);
+      if (ntp_stale) {
+        ntp_sync();
+      } else {
+        Serial.printf("[ntp] sync skipped (last %llu s ago, threshold %lu s)\n",
+                      (unsigned long long)elapsed_since_ntp,
+                      (unsigned long)NTP_OPPORTUNISTIC_INTERVAL_S);
+      }
 
       float vbat = read_vbat();
       float pct  = vbat_to_percent(vbat);
