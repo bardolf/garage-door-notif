@@ -29,7 +29,7 @@ Pošle se jednou, hned po tom co zařízení nastartuje (např. po výměně bat
 ```
 Cas: 17:23:45
 Baterka: 95 % (4,18 V)
-Signal: vyborna (-54 dBm)
+Signal: vyborny (-54 dBm)
 Sensor: baseline OK (|a|=0.998 g)
 ```
 
@@ -68,7 +68,7 @@ Cas: 21:00
 Stav: ZAVRENO
 Naklon: 2°
 Baterka: 87 % (4,10 V)
-Signal: dobra (-67 dBm)
+Signal: dobry (-67 dBm)
 ```
 
 ### ⚠️ „Hlidac vrat - CHYBA" — diagnostické chyby
@@ -87,7 +87,7 @@ Cas: 14:23
 Pocet chyb od posledniho hlaseni: 3
 Posledni: MPU sensor neodpovida (wake selhal)
 Baterka: 87 %
-Signal: dobra (-67 dBm)
+Signal: dobry (-67 dBm)
 ```
 
 **Co dělat:** otevřete garáž, zkontrolujte:
@@ -120,11 +120,11 @@ Procenta jsou orientační (LiPo baterka má nelineární vybíjení), ale dáva
 
 | Slovo ve zprávě | dBm | Co to znamená |
 |---|---|---|
-| **vyborna** | > −60 | velmi blízko routeru, žádný problém |
-| **dobra** | −60 až −70 | normální, plně dostačuje |
+| **vyborny** | > −60 | velmi blízko routeru, žádný problém |
+| **dobry** | −60 až −70 | normální, plně dostačuje |
 | **ok** | −70 až −80 | slabší, ale ještě funguje |
-| **slaba** | −80 až −90 | hraniční, občas může vypadnout |
-| **velmi slaba** | < −90 | nestabilní, alerty se nemusí dostat |
+| **slaby** | −80 až −90 | hraniční, občas může vypadnout |
+| **velmi slaby** | < −90 | nestabilní, alerty se nemusí dostat |
 
 Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. Ale obvykle není třeba řešit.
 

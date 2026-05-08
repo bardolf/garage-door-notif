@@ -46,7 +46,7 @@
 static const uint32_t WAKE_INTERVAL_S        = 300;     // 5 min
 static const float    TILT_THRESHOLD_OPEN    = 60.0f;   // dle README.md (sekce Architektura)
 static const float    TILT_THRESHOLD_CLOSE   = 40.0f;   // hystereze
-static const int      NIGHT_START_HOUR       = 22;
+static const int      NIGHT_START_HOUR       = 13;
 static const int      NIGHT_END_HOUR         = 6;
 static const int      HEARTBEAT_HOUR         = 21;
 // Cilove chovani: alert pri kazdem wake cyklu, pokud jsou vrata otevrena v nocnim okne.
@@ -123,13 +123,13 @@ static float read_vbat() {
   return (sum_mv / (float)N) / 1000.0f * 2.0f;
 }
 
-// ===== Helpers — WiFi signal =====
+// ===== Helpers — WiFi signal (signal je rod muzsky) =====
 static const char* rssi_label(int rssi) {
-  if (rssi >= -60) return "vyborna";
-  if (rssi >= -70) return "dobra";
+  if (rssi >= -60) return "vyborny";
+  if (rssi >= -70) return "dobry";
   if (rssi >= -80) return "ok";
-  if (rssi >= -90) return "slaba";
-  return "velmi slaba";
+  if (rssi >= -90) return "slaby";
+  return "velmi slaby";
 }
 
 // ===== Helpers — MPU6050 =====
@@ -530,6 +530,16 @@ static void do_wake_cycle() {
     }
   }
 
+  // Diagnostika: aktualni cas + jestli je v nocnim okne (pomáha při ladění alertů)
+  if (time_is_synced()) {
+    char timestr[32];
+    format_time(timestr, sizeof(timestr), "%H:%M:%S");
+    Serial.printf("[time] %s, hour=%d, night_window(%d-%d)=%s\n",
+                  timestr, current_hour(),
+                  NIGHT_START_HOUR, NIGHT_END_HOUR,
+                  is_night_window() ? "YES" : "NO");
+  }
+
   Serial.printf("[state] door=%s tilt=%.1f° alert=%d heart=%d ntp=%d err=%d (pending=%u)\n",
                 door_open ? "OPEN" : "closed", tilt,
                 need_alert, need_heartbeat, need_ntp, need_error_report,
@@ -573,6 +583,12 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   Serial.println();
+
+  // POZOR: TZ env var se nepřežije deep sleep, musíme ji nastavit při každém wake.
+  // ESP32 RTC zachovává unix čas, ale localtime_r() bez TZ defaultuje na UTC →
+  // is_night_window() pak srovnává UTC hodinu místo CET/CEST → alert silently skip.
+  setenv("TZ", TZ_CZ, 1);
+  tzset();
 
   esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
   bool cold_boot = (cause == ESP_SLEEP_WAKEUP_UNDEFINED);
