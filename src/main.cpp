@@ -211,6 +211,22 @@ static float vec_mag(const Vec3 &v) {
   return sqrtf(v.x*v.x + v.y*v.y + v.z*v.z);
 }
 
+// Slovni popis orientace sensoru z gravitacniho vektoru. Pomáhá pri instalaci
+// poznat, ze sensor je pri cold bootu v "necekane" poloze (typicky vrata
+// otevrena, kdyz user predpoklada zavrena) — logika tilt = 0° pri baseline
+// znamena, ze "stejna orientace jako pri zapnuti" se interpretuje jako vyhozi.
+// theta = uhel mezi gravitaci a osou Z (0° = lezi naplocho, 90° = vertikalne).
+static const char* orientation_label(const Vec3 &a, float &theta_out) {
+  float m = vec_mag(a);
+  if (isnan(m) || m < 1e-6f) { theta_out = 0; return "neznama"; }
+  float c = fabsf(a.z) / m;
+  if (c > 1.0f) c = 1.0f;
+  theta_out = acosf(c) * 180.0f / (float)PI;
+  if (theta_out < 25.0f) return "lezi naplocho (Z dominantni)";
+  if (theta_out > 65.0f) return "stoji vertikalne (X/Y dominantni)";
+  return "sikmo";
+}
+
 // 3D uhel mezi dvema accel vektory (v stupnich).
 static float angle_deg(const Vec3 &a, const Vec3 &b) {
   float ma = vec_mag(a), mb = vec_mag(b);
@@ -328,16 +344,25 @@ static bool is_night_window() {
 }
 
 // ===== Notifikacni zpravy =====
-static void send_boot_notification(float vbat, float vbat_pct, int rssi, float baseline_mag) {
+static void send_boot_notification(float vbat, float vbat_pct, int rssi, const Vec3 &baseline) {
   char timestr[32];
   format_time(timestr, sizeof(timestr), "%H:%M:%S");
-  char body[256];
+  float theta;
+  const char* orient = orientation_label(baseline, theta);
+  char body[384];
   snprintf(body, sizeof(body),
     "Cas: %s\n"
     "Baterka: %.0f %% (%.2f V)\n"
     "Signal: %s (%d dBm)\n"
-    "Sensor: baseline OK (|a|=%.3f g)",
-    timestr, vbat_pct, vbat, rssi_label(rssi), rssi, baseline_mag);
+    "Sensor: baseline OK\n"
+    "  ax=%+.2f  ay=%+.2f  az=%+.2f  (|a|=%.2f g)\n"
+    "  Orientace: %s (%.0f° od horizontaly)\n"
+    "Pozn.: tilt se pocita vuci teto poloze. Pokud orientace\n"
+    "neodpovida ocekavanemu stavu vrat, logika otevreno/zavreno\n"
+    "bude prevracena — staci RST tlacitko ve spravne poloze.",
+    timestr, vbat_pct, vbat, rssi_label(rssi), rssi,
+    baseline.x, baseline.y, baseline.z, vec_mag(baseline),
+    orient, theta);
   ntfy_send("Hlidac garazovych vrat aktivni", body, "default", "rocket");
 }
 
@@ -477,7 +502,7 @@ static void do_cold_boot() {
     int   rssi = WiFi.RSSI();
 
     if (state.baseline_valid) {
-      send_boot_notification(vbat, pct, rssi, vec_mag(state.baseline));
+      send_boot_notification(vbat, pct, rssi, state.baseline);
     }
     // Pokud chyby cekaji, posli error report (i kdyz boot prosel — alespon
     // user vi ze baseline failed atd.)
