@@ -1,0 +1,102 @@
+# box.scad — reference notes
+
+Working notes for `box.scad`. The .scad file has inline comments on every parameter; this doc covers the things that aren't obvious from reading parameter declarations: **design intent, parameter dependencies, and how to change common things.**
+
+## What's in the box
+
+Spodek (`base`):
+- **Battery cradle** along -Y half of the inner space, X axis. 60 mm open U-channel + 10 mm closed ring at +X end (battery stop).
+- **4 lid screw posts** in corners (M3 self-tap, Ø 7 mm, pilot 2.5 mm).
+- **ESP module mounts**: 2 standoffs (Ø 5, h 5, M2.5 pilot) on +X edge of PCB + 2 short under-supports (Ø 4, h 4) on -X (USB-C) edge.
+- **MPU6050 standoffs**: 2 on +Y edge of PCB, shifted toward +Y wall.
+- **USB-C cutout** in -X wall, centered on ESP Y.
+- **Rocker switch slot** in -X wall (next to USB-C, opens at top so switch slides in from above when lid is off).
+- **Zip-tie tunnels** through cradle at 25 % and 75 % of battery length.
+- **4 floor mounting holes** (Ø 3 mm wood screws to garage door, countersunk inside).
+
+Víko (`lid`):
+- Flat plate with 4 counterbored holes for M3 socket-cap (imbus) screws.
+- **Lid half-cradle** (10 mm long at -X end of battery): mirrors base U-channel, fully encircles battery's wire end. Doubles as orientation key — won't fit if lid is rotated 180° because it would collide with the +X ring.
+- **2 ESP pressure pins** that press the PCB down onto the under-supports (protects from USB-C insertion force).
+
+Build:
+```
+openscad -D 'part="base"' -o box-base.stl box.scad
+openscad -D 'part="lid"'  -o box-lid.stl  box.scad
+```
+Default `part="both"` renders side-by-side preview for GUI use.
+
+## Parameter dependencies (must hold)
+
+These are not enforced by the .scad — if you change a parameter, verify these still hold or you'll get clashes / non-printable geometry:
+
+1. **`inner_z` ≥ `cradle_under + batt_dia + batt_clearance + cradle_ring_ceil + 0.5`**
+   — otherwise the +X ring sticks above the box top and lifts the lid. Currently `inner_z = batt_dia + 3.5` gives 0.5 mm clearance.
+2. **`inner_y` ≥ `mod_y1_esp + post_intrude + 0.5`**
+   — keeps the +Y corner posts from colliding with the ESP module.
+3. **Zip-tie tunnel X positions** must be clear of `lid_cradle_len` (-X end) and the closed ring (+X end). Default 25/75 % gives 5 mm clearance both sides.
+4. **Lid cradle Y span = base cradle Y span** (both use `cradle_w` via `batt_axis_y_g`). If you reposition the battery in Y, both follow automatically.
+5. **`screw_inset + screw_post_dia/2 ≤ wall + post_intrude_clearance`** — corner posts must remain attached to the walls. Currently `5 + 3.5 - 3 = 5.5 mm` intrusion into inner space; cradle_y0 (= 6) and other features are designed around this.
+6. **Battery in cradle: clearance with -Y corner posts requires `cradle_y0 ≥ post_intrude + 0.5`** — i.e. cradle has to start 6 mm from inner -Y wall to not collide with corner posts.
+
+## How to change common things
+
+| You want to… | Change |
+|---|---|
+| Use a 14500 / different cell | `batt_len`, `batt_dia`. inner_z, inner_y will recompute. |
+| Make box wall thicker/thinner | `wall` (cradle Y_offset, corner post intrusion will follow) |
+| Shift MPU closer to battery | `mpu_y1 = mod_y0 + mpu_w` (was `mod_y1_esp`) |
+| Use socket-cap vs flat-head lid screws | `lid_cbore_dia` and `lid_cbore_depth` (currently set for socket cap; for flat head use cone `cylinder(d1=clear, d2=head_dia, h=...)`) |
+| Move rocker switch | `switch_y_offset` (along -X wall) |
+| Resize rocker switch | `switch_w`, `switch_h` |
+| Skip USB-C cutout (no USB exposure) | comment out the USB-C subtraction block in `base()` |
+| Different battery retention | Lid cradle (`lid_cradle_len`) and/or zip-tie tunnels (`zip_x1_g`, `zip_x2_g`) — both currently active |
+| Reposition module screws (after measuring actual board) | `esp_hole_sp`, `esp_hole_inset`, `mpu_hole_sp`, `mpu_hole_inset` |
+| Reposition ESP under-supports (after measuring) | `esp_support_sp`, `esp_support_x_inset`, `esp_support_h` |
+| Reposition ESP lid pins (after measuring) | `esp_lid_pin_dx`, `esp_lid_pin_dy` |
+| Floor mounting holes elsewhere | `mount_x_offset`, `mount_y_offset` (from outer wall) |
+
+## Things marked REMEASURE
+
+These default values are educated guesses; measure the real boards and update:
+
+- `esp_support_sp` (10 mm) — Y spacing between USB-C side under-supports
+- `esp_support_x_inset` (2 mm) — X distance from PCB -X edge
+- `esp_support_h` (4 mm) — height; must clear bottom-side components on ESP PCB
+- `esp_lid_pin_dx` (30 mm) — X from ESP mount hole to lid pin (toward USB-C)
+- `esp_lid_pin_dy` (2 mm) — Y from each mount hole inward
+- `usb_w`, `usb_h` (12 × 6 mm) — USB-C cutout; widen if needed for thick cables
+- `switch_w`, `switch_h` (20 × 7 mm) — rocker switch cutout
+
+## Assembly procedure
+
+1. Box base, lid off, modules NOT yet attached.
+2. Screw the base onto the garage door through the 4 floor holes (3 mm wood screws, countersunk inside).
+3. Solder battery wires (no holder; bare-wire 18650).
+4. Drop battery into cradle: tilt with +X end first, insert into closed ring section, then lower -X end into the U-channel.
+5. Solder wires to rocker switch (outside the box), then slide switch into the slot in -X wall from above.
+6. Optionally: thread one or two zip-ties through the tunnels, over the battery, lock on -Y side.
+7. Screw ESP module to its two +X-edge standoffs (M2.5 self-tap, ~5–6 mm length).
+8. Screw MPU6050 to its two +Y-edge standoffs.
+9. Place lid (must be correctly oriented — lid cradle at the -X end). Tighten 4 M3 cap screws.
+
+## Print notes
+
+- **Material**: PETG recommended for the ring + lid cradle (some flex needed). PLA works but is more brittle on thin overhangs.
+- **Layer height**: 0.2 mm fine for most parts; closed ring section at +X has a ~10 mm bridge at the top (battery diameter); use bridging-friendly settings.
+- **Orientation**:
+  - Base: flat on bed (floor down). No supports needed except inside the closed ring at +X end (small bridge, usually OK without).
+  - Lid: top side up (lid cradle protrudes from underside; print needs to be flipped from default OpenSCAD render — features sticking up).
+- **Walls**: 3+ perimeters recommended; screw posts and standoffs benefit from solid extrusion.
+- **First print**: do a draft (0.3 mm, 2 perimeters) of just the base to verify all the components fit before printing final.
+
+## Known TODOs / future tweaks
+
+- Battery insertion is angled (+X end first, then drop -X end). Lid cradle is added separately, so insertion stays the same as without it.
+- Lid pressure pins are 15.4 mm tall × Ø 3.5 — verify they don't crack during print/use; can shorten via `esp_lid_pin_h` override or thicken by increasing `esp_lid_pin_dia`.
+- Zip-tie head: ensure 6+ mm of strip free between -Y wall and cradle for the head to sit; current = 6 mm (cradle_y0). If you make the cradle thicker (`cradle_side`), this shrinks.
+
+## Box dimensions (current defaults)
+
+- Outer: **80 × 70.1 × 28 mm** (base 25 mm + lid 3 mm)
+- Inner: 74 × 64.1 × 22 mm
