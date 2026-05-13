@@ -73,7 +73,7 @@ WAKE CYCLE (každých 5 min)
 | Položka | Stav | Pozn. |
 |---|---|---|
 | **DFRobot FireBeetle ESP32-E V1.0** (board ID `dfrobot_firebeetle2_esp32e`) | ✅ aktuální PoC | ESP32 + WiFi + integrovaný TP4056 charger + JST-PH 2.0. CH340 USB-Serial má ~430 µA leak — viz [Spotřeba](#spotřeba). |
-| **[LaskKit ESP-12 board](https://www.laskakit.cz/laskkit-esp-12-board/)** | 🔄 plánovaná migrace | ESP32-C3, nativní USB-CDC (žádný CH340), cíl ~20 µA sleep — viz [Migrace na ESP32-C3](#migrace-na-esp32-c3) |
+| **[LaskKit ESP-12 board](https://www.laskakit.cz/laskkit-esp-12-board/)** | 🔄 plánovaná migrace | ESP32-C3, nativní USB-CDC (žádný CH340), cíl ~20 µA sleep — viz [Migrace na ESP32-C3](#migrace-na-esp32-c3). **Pozor: existují 2 varianty desky** — jedna s integrovanou PCB anténou (plug-and-play), druhá s u.FL/IPEX konektorem pro **externí anténu + pigtail kabel** (nutno dokoupit zvlášť). Při objednávce ověřit kterou variantu máš; pokud externí, dokoupit anténu 2,4 GHz + u.FL pigtail. |
 | **GY-521 MPU6050** (akcelerometr) | ✅ funguje | 6-axis IMU, I²C, on-board 3,3 V LDO + 4,7k pull-upy |
 | **[LaskKit GeB Li-Ion 18650 1S1P 3,7 V 3200 mAh](https://www.laskakit.cz/geb-li-ion-baterie-1x18650-1s1p-3-7v-3200mah/)** | ✅ zvolená baterie | 18650 cell s integrovanou ochranou (over-discharge / over-current). Nabíjí se přes USB FireBeetle (TP4056). Ověřit JST-PH 2.0 konektor / případně zalisovat. |
 | **DuPont kabely female-female ×4** | ✅ mám | propojení MPU ↔ ESP (VCC, GND, SDA, SCL) |
@@ -255,6 +255,38 @@ Pro PoC akceptovatelné. Pro **~1 rok mezi nabíjeními** je nutná migrace na d
 - ✅ GPIO2 LED — programovatelná, off-stav = 0 mA, **netřeba odpájet** (firmware ji prostě nedriverуje HIGH)
 - ✅ GY-521 zelená LED — naměřeno 1,44 mA always-on, **odpájet před deploymentem**
 - ✅ Vbat měření: `analogReadMilliVolts()` s eFuse calibration → chyba <0,5 % vs multimetr (žádný externí faktor netřeba)
+
+### Wake interval vs. životnost (projekce pro ESP32-C3)
+
+Otázka: jak se mění životnost, pokud probouzím častěji? Předpoklad: počet odeslaných zpráv (alerty + heartbeat) zůstává konstantní ~5/den, mění se jen frekvence MPU read cyklů bez WiFi.
+
+**Vstupy** (z naměřených / teoretických hodnot výše):
+- Wake bez WiFi: 50 mA × 0,2 s = **0,00278 mAh/wake**
+- WiFi event: 80 mA × 5 s = 0,111 mAh × 5/den = **0,56 mAh/den**
+- Sleep ESP32-C3 + MPU sleep cíl ~20 µA × 24 h = **0,48 mAh/den**
+- Self-discharge 18650 (3 %/měs ze 3200 mAh) = **3,2 mAh/den**
+- Kapacita: 3200 mAh
+
+| Wake int. | Wakes/den | Wake E [mAh] | Sleep [mAh] | WiFi [mAh] | Self-disch. [mAh] | **Σ/den** | **Životnost** |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 min  | 1440 | 4,00 | 0,48 | 0,56 | 3,2 | **8,24** | ~388 dní (~1,06 r) |
+| 2 min  | 720  | 2,00 | 0,48 | 0,56 | 3,2 | **6,24** | ~513 dní (~1,40 r) |
+| 5 min  | 288  | 0,80 | 0,48 | 0,56 | 3,2 | **5,04** | ~635 dní (~1,74 r) |
+| 10 min | 144  | 0,40 | 0,48 | 0,56 | 3,2 | **4,64** | ~690 dní (~1,89 r) |
+| 20 min | 72   | 0,20 | 0,48 | 0,56 | 3,2 | **4,44** | ~721 dní (~1,98 r) |
+| 30 min | 48   | 0,13 | 0,48 | 0,56 | 3,2 | **4,37** | ~732 dní (~2,00 r) |
+
+**Insight: self-discharge ~3,2 mAh/den je floor, který nelze podlézt.** Sleep + zprávy přidají dalších ~1,0 mAh/den (taky fixní). Variabilní část = wake events:
+
+- **5 min** (aktuální): 0,80 mAh/den, +25 % nad floor — rozumný kompromis
+- **2 min**: 2,0 mAh/den, +62 % nad floor — znatelný hit (cena: −24 % životnosti vs. 5 min)
+- **1 min**: 4,0 mAh/den, +125 % nad floor — wake events už dominují nad samovybíjením
+
+➜ Mezi „self-discharge převažuje" a „wake events převažují" je hranice **někde mezi 2 a 5 min wake intervalem**. Pod 5 min jdeme rapidně dolů, nad 5 min už další zpomalování přínos nedává (rozdíl 5 → 30 min je jen ~15 % životnosti).
+
+**Caveats:** kalkulace neuvažují kapacitní degradaci (~3–5 %/r), chlad v zimě (−20–30 % efektivní kapacity) ani stuck-open scénář (vrata nechaná otevřená přes noc → ~120 alertů přes rate-limit → ~13 mAh extra v jedné noci). Reálná životnost bude o 20–40 % nižší.
+
+Na **aktuálním FireBeetle** (sleep 0,47 mA = 11,3 mAh/den) je tento výpočet bezpředmětný — sleep proud desky 3× převyšuje self-discharge a wake interval mizí v šumu (1 min vs. 30 min = jen ~25 % rozdíl, oba ~6–7 měsíců).
 
 ---
 

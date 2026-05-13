@@ -17,7 +17,7 @@ lid_thk       = 3.0;
 batt_len           = 70.0;
 batt_dia           = 18.5;
 batt_clearance     = 0.5;     // radial slop
-batt_ring_len      = 10.0;    // closed ring section at far end (battery stop)
+batt_ring_len      = 6.0;    // closed ring section at far end (battery stop)
 cradle_side        = 2.0;     // side wall outside battery diameter
 cradle_under       = 1.0;     // material between cradle bottom and box floor
 cradle_ring_ceil   = 1.5;     // material above battery in ring section
@@ -53,6 +53,14 @@ lid_cbore_depth     = 2.0;    // partial recess (M3 cap head is 3.0 mm; ~1 mm st
 // ===== USB-C cutout (in -X wall, centered on ESP USB-C) =====
 usb_w           = 12.0;
 usb_h           = 6.0;
+
+// ===== anteni otvor (v +X stene, protilehla od USB-C) =====
+// Y zarovnano s USB-C (ne v geometrickem stredu +X steny).
+// Z posunuto vys nez USB-C — bulkhead konektor potrebuje misto pro matku/podlozku
+// na vnitrni strane a aby byl dal od podlahy / baterie.
+// 6.2 mm sedi na zavit RP-SMA / SMA bulkhead konektoru.
+ant_hole_dia    = 6.2;
+ant_hole_z_lift = 5.0;   // o kolik vyse nez usb_z_center (mm)
 
 // ===== floor mounting holes (4× Ø 3 mm wood screw, countersunk inside the box) =====
 // Box is screwed to the garage door from the inside (lid off, modules removed).
@@ -249,6 +257,11 @@ module base() {
     // USB-C cutout through -X wall
     translate([-EPS, usb_y_center - usb_w/2, usb_z_center - usb_h/2])
       cube([wall + 2*EPS, usb_w, usb_h]);
+
+    // Anteni otvor pres +X stenu (Y zarovnano s USB-C, Z zvednuto)
+    translate([outer_x - wall - EPS, usb_y_center, usb_z_center + ant_hole_z_lift])
+      rotate([0, 90, 0])
+        cylinder(d = ant_hole_dia, h = wall + 2*EPS);
 
     // Rocker-switch slot through -X wall (next to USB-C), OPEN at top of wall
     switch_y_center = usb_y_center + switch_y_offset;
