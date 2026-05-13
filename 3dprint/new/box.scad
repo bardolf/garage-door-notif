@@ -25,14 +25,14 @@ cradle_ring_ceil   = 1.5;     // material above battery in ring section
 // ===== ESP module =====
 esp_l           = 34.5;       // along X, USB-C on -X short edge
 esp_w           = 25.6;       // along Y
-esp_hole_sp     = 16.0;       // hole spacing on +X short edge (along Y)
+esp_hole_sp     = 20.0;       // hole spacing on +X short edge (along Y) — MEASURED
 esp_hole_inset  = 2.5;        // hole inset from +X edge
 esp_pcb_thk     = 1.6;
 
 // ===== MPU6050 =====
 mpu_l           = 21.0;       // along X
 mpu_w           = 15.0;       // along Y
-mpu_hole_sp     = 16.0;       // hole spacing on +Y long edge (along X)
+mpu_hole_sp     = 15.0;       // hole spacing on +Y long edge (along X) — MEASURED
 mpu_hole_inset  = 2.5;        // hole inset from +Y edge
 
 // ===== module standoffs (M2.5 self-tap) =====
@@ -79,16 +79,20 @@ zip_tunnel_w     = 4.5;       // X width (zip-tie body)
 zip_tunnel_h     = 3.0;       // Z height
 zip_tunnel_floor_gap = 0.5;   // gap above the box floor where the tunnel bottom sits
 
-// ===== ESP under-support standoffs (USB-C side, non-threaded) =====
-esp_support_dia       = 4.0;
-esp_support_h         = 4.0;  // shorter than standoff_h to clear bottom-side components
-esp_support_sp        = 10.0; // center-to-center Y spacing — REMEASURE & ADJUST
-esp_support_x_inset   = 2.0;  // distance from PCB -X edge to support center
+// ===== ESP under-support (single central pillar, USB-C side, non-threaded) =====
+esp_support_dia            = 4.0;   // MEASURED
+esp_support_h              = 5.0;   // same as mounting standoff_h — MEASURED
+esp_support_dx_from_mount  = 26.0;  // X dist from ESP mount hole (toward USB-C) — MEASURED
 
-// ===== ESP lid pressure pins (protect PCB from USB-C insertion force) =====
-esp_lid_pin_dia  = 3.5;
-esp_lid_pin_dx   = 30.0;      // X dist from mount hole to pin (toward USB-C) — REMEASURE
-esp_lid_pin_dy   = 2.0;       // Y dist from each mount hole inward — REMEASURE
+// ===== ESP lid pressure pin (single, protects PCB from USB-C insertion force) =====
+esp_lid_pin_dia  = 4.0;       // MEASURED
+esp_lid_pin_dx   = 31.0;      // X dist from mount hole to pin (toward USB-C) — MEASURED
+esp_lid_pin_gap  = 5.5;       // Z gap between under-support top and lid pin bottom — MEASURED
+
+// ===== LED viewing hole in lid (NeoPixel on ESP module shines through) =====
+led_hole_dia              = 4.0;   // priezor pro indikacni RGB LED
+led_x_from_mount          = 18.0;  // X dist from ESP mount-hole line (toward USB-C) — MEASURED
+led_y_from_pcb_inner_edge = 6.0;   // Y dist from ESP PCB edge nearest to battery — MEASURED
 
 // ===== gaps =====
 mod_gap_y       = 3.0;        // cradle <-> modules
@@ -148,18 +152,18 @@ batt_top_z_g   = batt_axis_z_g + batt_dia/2;
 zip_x1_g       = batt_x_start_g + batt_len * 0.25;
 zip_x2_g       = batt_x_start_g + batt_len * 0.75;
 
-// ESP under-supports
-esp_support_x_g  = wall + esp_x0 + esp_support_x_inset;
+// ESP under-support (single pillar on ESP Y center)
 esp_center_y_g   = wall + mod_y0 + esp_w/2;
-esp_support_y1_g = esp_center_y_g - esp_support_sp/2;
-esp_support_y2_g = esp_center_y_g + esp_support_sp/2;
+esp_support_x_g  = wall + esp_hole_x - esp_support_dx_from_mount;
 
-// ESP lid pressure pins
+// ESP lid pressure pin (single, on ESP Y center)
 esp_lid_pin_x_g  = wall + esp_hole_x - esp_lid_pin_dx;
-esp_lid_pin_y1_g = wall + esp_hole_y1 + esp_lid_pin_dy;
-esp_lid_pin_y2_g = wall + esp_hole_y2 - esp_lid_pin_dy;
-esp_pcb_top_z_g  = floor_thk + standoff_h + esp_pcb_thk;
-esp_lid_pin_h    = outer_z_base - esp_pcb_top_z_g;  // pin reaches from lid bottom to PCB top
+// pin length: spans from lid bottom down to (under-support top + gap)
+esp_lid_pin_h    = outer_z_base - floor_thk - esp_support_h - esp_lid_pin_gap;
+
+// LED viewing hole (through lid, above NeoPixel on ESP module)
+led_hole_x_g     = wall + esp_hole_x - led_x_from_mount;
+led_hole_y_g     = wall + mod_y0 + led_y_from_pcb_inner_edge;
 
 // ===== modules =====
 
@@ -237,10 +241,9 @@ module base() {
       for (sx = [mpu_hole_x1, mpu_hole_x2])
         translate([wall + sx, wall + mpu_hole_y, floor_thk]) standoff();
 
-      // ESP under-supports (USB-C side, 2 short pillars, no pilot hole)
-      for (sy = [esp_support_y1_g, esp_support_y2_g])
-        translate([esp_support_x_g, sy, floor_thk])
-          cylinder(d = esp_support_dia, h = esp_support_h);
+      // ESP under-support (USB-C side, single central pillar, no pilot hole)
+      translate([esp_support_x_g, esp_center_y_g, floor_thk])
+        cylinder(d = esp_support_dia, h = esp_support_h);
     }
 
     // USB-C cutout through -X wall
@@ -289,15 +292,18 @@ module lid() {
                      h = lid_cradle_len + 2*EPS);
       }
 
-      // ESP pressure pins (protect PCB from USB-C insertion force)
-      for (py = [esp_lid_pin_y1_g, esp_lid_pin_y2_g])
-        translate([esp_lid_pin_x_g, py, -esp_lid_pin_h])
-          cylinder(d = esp_lid_pin_dia, h = esp_lid_pin_h);
+      // ESP pressure pin (single, protects PCB from USB-C insertion force)
+      translate([esp_lid_pin_x_g, esp_center_y_g, -esp_lid_pin_h])
+        cylinder(d = esp_lid_pin_dia, h = esp_lid_pin_h);
     }
     // Through screw holes with counterbore
     for (px = [screw_inset, outer_x - screw_inset])
       for (py = [screw_inset, outer_y - screw_inset])
         translate([px, py, 0]) lid_screw_hole();
+
+    // LED viewing hole — průchozí, nad NeoPixelem na ESP modulu
+    translate([led_hole_x_g, led_hole_y_g, -EPS])
+      cylinder(d = led_hole_dia, h = lid_thk + 2*EPS);
   }
 }
 

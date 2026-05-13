@@ -90,7 +90,8 @@ struct Vec3 { float x, y, z; };
 // Pri brownout / WDT reset RTC mem se zachovat, ale `esp_sleep_get_wakeup_cause()`
 // vraci UNDEFINED (jako pri cold boot). Bez sentinelu bychom prepisovali platnou
 // state baseline. Magic = libovolny "unlikely random" 32-bit pattern.
-static const uint32_t STATE_MAGIC = 0xC0FFEE42;
+// Bump on any change to struct layout below — invalidates existing RTC state.
+static const uint32_t STATE_MAGIC = 0xC0FFEE43;
 
 RTC_DATA_ATTR struct {
   uint32_t magic;                     // STATE_MAGIC pokud je state platny
@@ -98,6 +99,7 @@ RTC_DATA_ATTR struct {
   uint64_t last_alert_unix;
   int      last_heartbeat_yday;       // -1 = nikdy
   uint64_t last_ntp_unix;
+  uint64_t first_boot_unix;           // 0 = nenastaveno; set on first NTP success
   Vec3     baseline;
   bool     baseline_valid;
   bool     door_was_open;
@@ -284,6 +286,7 @@ static bool ntp_sync() {
       strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", &tm_local);
       Serial.printf("OK -> %s\n", buf);
       state.last_ntp_unix = now;
+      if (state.first_boot_unix == 0) state.first_boot_unix = (uint64_t)now;
       return true;
     }
     delay(200);
@@ -384,16 +387,31 @@ static void send_heartbeat(bool door_open, float tilt, float vbat, float vbat_pc
   const char* tag = (vbat_pct > 50) ? "white_check_mark"
                   : (vbat_pct > 20) ? "yellow_circle"
                                     : "battery";
-  char body[256];
+
+  // Uptime — od prvniho uspesneho NTP syncu (typicky cold boot).
+  char uptime_str[32] = "?";
+  if (state.first_boot_unix > 0) {
+    time_t now; time(&now);
+    int64_t elapsed = (int64_t)now - (int64_t)state.first_boot_unix;
+    if (elapsed < 0) elapsed = 0;
+    long days  = (long)(elapsed / 86400);
+    long hours = (long)((elapsed % 86400) / 3600);
+    long mins  = (long)((elapsed % 3600) / 60);
+    snprintf(uptime_str, sizeof(uptime_str), "%ldd %ldh %ldm", days, hours, mins);
+  }
+
+  char body[320];
   snprintf(body, sizeof(body),
     "Cas: %s\n"
     "Stav: %s\n"
     "Naklon: %.0f°\n"
     "Baterka: %.0f %% (%.2f V)\n"
-    "Signal: %s (%d dBm)",
+    "Signal: %s (%d dBm)\n"
+    "Bezi: %s",
     timestr,
     door_open ? "OTEVRENO" : "ZAVRENO",
-    tilt, vbat_pct, vbat, rssi_label(rssi), rssi);
+    tilt, vbat_pct, vbat, rssi_label(rssi), rssi,
+    uptime_str);
   ntfy_send("Garaz - denni kontrola", body, "low", tag);
 }
 
@@ -465,6 +483,7 @@ static void do_cold_boot() {
   state.last_alert_unix        = 0;
   state.last_heartbeat_yday    = -1;
   state.last_ntp_unix          = 0;
+  state.first_boot_unix        = 0;
   state.baseline_valid         = false;
   state.door_was_open          = false;
   state.pending_error_count    = 0;

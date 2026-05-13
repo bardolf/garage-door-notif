@@ -7,7 +7,7 @@ Working notes for `box.scad`. The .scad file has inline comments on every parame
 Spodek (`base`):
 - **Battery cradle** along -Y half of the inner space, X axis. 60 mm open U-channel + 10 mm closed ring at +X end (battery stop).
 - **4 lid screw posts** in corners (M3 self-tap, Ø 7 mm, pilot 2.5 mm).
-- **ESP module mounts**: 2 standoffs (Ø 5, h 5, M2.5 pilot) on +X edge of PCB + 2 short under-supports (Ø 4, h 4) on -X (USB-C) edge.
+- **ESP module mounts**: 2 standoffs (Ø 5, h 5, M2.5 pilot) on +X edge of PCB + 1 central under-support (Ø 4, h 5) on -X (USB-C) edge.
 - **MPU6050 standoffs**: 2 on +Y edge of PCB, shifted toward +Y wall.
 - **USB-C cutout** in -X wall, centered on ESP Y.
 - **Rocker switch slot** in -X wall (next to USB-C, opens at top so switch slides in from above when lid is off).
@@ -17,7 +17,7 @@ Spodek (`base`):
 Víko (`lid`):
 - Flat plate with 4 counterbored holes for M3 socket-cap (imbus) screws.
 - **Lid half-cradle** (10 mm long at -X end of battery): mirrors base U-channel, fully encircles battery's wire end. Doubles as orientation key — won't fit if lid is rotated 180° because it would collide with the +X ring.
-- **2 ESP pressure pins** that press the PCB down onto the under-supports (protects from USB-C insertion force).
+- **1 ESP pressure pin** centered between the mounting holes (Y-axis), pressing the PCB down from above (protects from USB-C insertion force).
 
 Build:
 ```
@@ -52,19 +52,14 @@ These are not enforced by the .scad — if you change a parameter, verify these 
 | Skip USB-C cutout (no USB exposure) | comment out the USB-C subtraction block in `base()` |
 | Different battery retention | Lid cradle (`lid_cradle_len`) and/or zip-tie tunnels (`zip_x1_g`, `zip_x2_g`) — both currently active |
 | Reposition module screws (after measuring actual board) | `esp_hole_sp`, `esp_hole_inset`, `mpu_hole_sp`, `mpu_hole_inset` |
-| Reposition ESP under-supports (after measuring) | `esp_support_sp`, `esp_support_x_inset`, `esp_support_h` |
-| Reposition ESP lid pins (after measuring) | `esp_lid_pin_dx`, `esp_lid_pin_dy` |
+| Reposition ESP under-support (single pillar) | `esp_support_dx_from_mount`, `esp_support_dia`, `esp_support_h` |
+| Reposition / resize ESP lid pin (single) | `esp_lid_pin_dx`, `esp_lid_pin_dia`, `esp_lid_pin_gap` |
 | Floor mounting holes elsewhere | `mount_x_offset`, `mount_y_offset` (from outer wall) |
 
 ## Things marked REMEASURE
 
-These default values are educated guesses; measure the real boards and update:
+ESP-related dimensions are MEASURED from a real board. The rest are educated guesses; measure and update as needed:
 
-- `esp_support_sp` (10 mm) — Y spacing between USB-C side under-supports
-- `esp_support_x_inset` (2 mm) — X distance from PCB -X edge
-- `esp_support_h` (4 mm) — height; must clear bottom-side components on ESP PCB
-- `esp_lid_pin_dx` (30 mm) — X from ESP mount hole to lid pin (toward USB-C)
-- `esp_lid_pin_dy` (2 mm) — Y from each mount hole inward
 - `usb_w`, `usb_h` (12 × 6 mm) — USB-C cutout; widen if needed for thick cables
 - `switch_w`, `switch_h` (20 × 7 mm) — rocker switch cutout
 
@@ -93,8 +88,9 @@ These default values are educated guesses; measure the real boards and update:
 ## Known TODOs / future tweaks
 
 - Battery insertion is angled (+X end first, then drop -X end). Lid cradle is added separately, so insertion stays the same as without it.
-- Lid pressure pins are 15.4 mm tall × Ø 3.5 — verify they don't crack during print/use; can shorten via `esp_lid_pin_h` override or thicken by increasing `esp_lid_pin_dia`.
+- Lid pressure pin is 11.5 mm tall × Ø 4.0 — single central pin, computed from `outer_z_base - floor_thk - esp_support_h - esp_lid_pin_gap`.
 - Zip-tie head: ensure 6+ mm of strip free between -Y wall and cradle for the head to sit; current = 6 mm (cradle_y0). If you make the cradle thicker (`cradle_side`), this shrinks.
+- ~~**Status LED window in lid**~~: hotovo — průchozí Ø 4 mm díra v lid plate, řízeno parametry `led_hole_dia`, `led_x_from_mount`, `led_y_from_pcb_inner_edge`. Pozice odměřena z reálné desky.
 
 ## Box dimensions (current defaults)
 
