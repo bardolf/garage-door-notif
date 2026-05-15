@@ -202,19 +202,6 @@ Detaily a uživatelský pohled v [`USAGE.md`](USAGE.md).
 
 ---
 
-## Secrets
-
-Citlivé údaje (WiFi heslo, ntfy topic) jsou v `include/secrets.h`, **neverzuje se** (.gitignored). Pro nový clone:
-
-```bash
-cp include/secrets.h.example include/secrets.h
-# uprav WIFI_SSID, WIFI_PASS, NTFY_TOPIC v include/secrets.h
-```
-
-Soubor se kompiluje přímo do binárky přes `#include "secrets.h"` v `src/main.cpp`.
-
----
-
 ## ntfy.sh
 
 - Topic: `milan-garaz-2026-x8kf3pq7vn` (random, regenerovat před deploymentem)

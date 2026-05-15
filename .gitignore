@@ -3,9 +3,6 @@
 .vscode/
 .idea/
 
-# Secrets — WiFi heslo, ntfy topic atd.
-include/secrets.h
-
 # OS junk
 .DS_Store
 Thumbs.db

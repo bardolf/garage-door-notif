@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "config.h"
-#include "secrets.h"
 
 Config cfg;
 
@@ -25,10 +24,12 @@ void cfg_load() {
 
   cfg.configured = p.getBool("configured", false);
 
-  copy_to_cfield(cfg.wifi_ssid,   p.getString("wifi_ssid",   WIFI_SSID),    CFG_STR_MAX);
-  copy_to_cfield(cfg.wifi_pass,   p.getString("wifi_pass",   WIFI_PASS),    CFG_STR_MAX);
-  copy_to_cfield(cfg.ntfy_topic,  p.getString("ntfy_topic",  NTFY_TOPIC),   CFG_STR_MAX);
-  copy_to_cfield(cfg.device_name, p.getString("device_name", "garaz"),      CFG_STR_MAX);
+  // Fresh install: NVS klice nejsou, fallback je prazdny string. cfg.configured
+  // bude false → setup() prepne do AP modu kde user vyplni form.
+  copy_to_cfield(cfg.wifi_ssid,   p.getString("wifi_ssid",   ""),       CFG_STR_MAX);
+  copy_to_cfield(cfg.wifi_pass,   p.getString("wifi_pass",   ""),       CFG_STR_MAX);
+  copy_to_cfield(cfg.ntfy_topic,  p.getString("ntfy_topic",  ""),       CFG_STR_MAX);
+  copy_to_cfield(cfg.device_name, p.getString("device_name", "garaz"),  CFG_STR_MAX);
 
   cfg.night_start_hour  = p.getUChar ("night_start", NIGHT_START_HOUR);
   cfg.night_end_hour    = p.getUChar ("night_end",   NIGHT_END_HOUR);

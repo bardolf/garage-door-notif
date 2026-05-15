@@ -444,7 +444,8 @@ void setup() {
                 static_cast<int>(cause), static_cast<int>(true_cold_boot),
                 static_cast<unsigned>(state.magic));
 
-  // Nacti NVS config (defaults z config.h / secrets.h pro nenalezene klice).
+  // Nacti NVS config (defaults z config.h pro nenalezene klice, prazdne stringy
+  // pro creds → cfg.configured=false pri fresh installu → AP mode).
   cfg_load();
 
   bool force_ap = double_rst || ext_ap_trigger;
