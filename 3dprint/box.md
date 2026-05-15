@@ -5,12 +5,13 @@ Working notes for `box.scad`. The .scad file has inline comments on every parame
 ## What's in the box
 
 Spodek (`base`):
-- **Battery cradle** along -Y half of the inner space, X axis. 60 mm open U-channel + 10 mm closed ring at +X end (battery stop).
+- **Battery cradle** along -Y half of the inner space, X axis. 64 mm open U-channel + 6 mm closed ring at +X end (battery stop).
 - **4 lid screw posts** in corners (M3 self-tap, Ø 7 mm, pilot 2.5 mm).
 - **ESP module mounts**: 2 standoffs (Ø 5, h 5, M2.5 pilot) on +X edge of PCB + 1 central under-support (Ø 4, h 5) on -X (USB-C) edge.
 - **MPU6050 standoffs**: 2 on +Y edge of PCB, shifted toward +Y wall.
 - **USB-C cutout** in -X wall, centered on ESP Y.
-- **Rocker switch slot** in -X wall (next to USB-C, opens at top so switch slides in from above when lid is off).
+- **Antenna hole** Ø 6.5 mm in +X wall (opposite USB-C), Z offset +5 mm above USB-C center — sedí na závit RP-SMA / SMA bulkhead konektoru.
+- **Rocker switch slot** in -X wall, OPEN at top (switch slides in from above). Y offset +2 mm from USB-C center toward +Y edge.
 - **Zip-tie tunnels** through cradle at 25 % and 75 % of battery length.
 - **4 floor mounting holes** (Ø 3 mm wood screws to garage door, countersunk inside).
 
@@ -34,7 +35,7 @@ These are not enforced by the .scad — if you change a parameter, verify these 
    — otherwise the +X ring sticks above the box top and lifts the lid. Currently `inner_z = batt_dia + 3.5` gives 0.5 mm clearance.
 2. **`inner_y` ≥ `mod_y1_esp + post_intrude + 0.5`**
    — keeps the +Y corner posts from colliding with the ESP module.
-3. **Zip-tie tunnel X positions** (25 / 75 % of battery length) must be clear of the centered `lid_cradle_len` (at 50 %) and the closed ring (+X end). 10 mm cradle at center leaves ~7.5 mm clearance to each tunnel.
+3. **Zip-tie tunnel X positions** (25 / 75 % of battery length) must be clear of the centered `lid_cradle_len` (at 50 %) and the closed ring (+X end). With `batt_len = 70` a `lid_cradle_len = 10`, tunnel centers are at 22.5 / 57.5 mm a lid cradle obsazuje 35–45 mm → ~12.5 mm mezery k oběma tunelům.
 4. **Lid cradle Y span = base cradle Y span** (both use `cradle_w` via `batt_axis_y_g`). If you reposition the battery in Y, both follow automatically.
 5. **`screw_inset + screw_post_dia/2 ≤ wall + post_intrude_clearance`** — corner posts must remain attached to the walls. Currently `5 + 3.5 - 3 = 5.5 mm` intrusion into inner space; cradle_y0 (= 6) and other features are designed around this.
 6. **Battery in cradle: clearance with -Y corner posts requires `cradle_y0 ≥ post_intrude + 0.5`** — i.e. cradle has to start 6 mm from inner -Y wall to not collide with corner posts.
@@ -50,6 +51,8 @@ These are not enforced by the .scad — if you change a parameter, verify these 
 | Move rocker switch | `switch_y_offset` (along -X wall) |
 | Resize rocker switch | `switch_w`, `switch_h` |
 | Skip USB-C cutout (no USB exposure) | comment out the USB-C subtraction block in `base()` |
+| Resize antenna hole (jiný SMA gauge) | `ant_hole_dia` (default 6.5 mm pro RP-SMA bulkhead) |
+| Posunout antenni otvor vyse / nize | `ant_hole_z_lift` (default 5 mm nad USB-C Z center) |
 | Different battery retention | Lid cradle (`lid_cradle_len`) and/or zip-tie tunnels (`zip_x1_g`, `zip_x2_g`) — both currently active |
 | Reposition module screws (after measuring actual board) | `esp_hole_sp`, `esp_hole_inset`, `mpu_hole_sp`, `mpu_hole_inset` |
 | Reposition ESP under-support (single pillar) | `esp_support_dx_from_mount`, `esp_support_dia`, `esp_support_h` |
