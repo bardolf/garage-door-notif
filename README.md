@@ -70,14 +70,20 @@ WAKE CYCLE (každých 5 min)
 
 ### BOM
 
-| Položka | Stav | Pozn. |
-|---|---|---|
-| **[LaskaKit ESP32-C3-LPKit v4](https://www.laskakit.cz/laskkit-esp-12-board/)** (board ID `esp32-c3-devkitm-1`) | ✅ aktuální PoC | ESP32-C3 (RISC-V), nativní USB-CDC bez externího USB-Serial čipu, on-board WS2812 NeoPixel RGB LED (GPIO9), JST-PH 2.0 + integrovaný LiPo charger, low-quiescent LDO se softwarovým `PERIPH_EN` switchem (GPIO4) pro perif. rail. Sleep proud naměřeno **19 µA** — viz [Spotřeba](#spotřeba). **Pozor: existují 2 varianty desky** — jedna s integrovanou PCB anténou (plug-and-play), druhá s u.FL/IPEX konektorem pro **externí anténu + pigtail kabel** (nutno dokoupit zvlášť). Při objednávce ověřit kterou variantu máš; pokud externí, dokoupit anténu 2,4 GHz + u.FL pigtail. |
-| **GY-521 MPU6050 / MPU6500** (akcelerometr) | ✅ funguje | 6-axis IMU, I²C adresa `0x68`, on-board 3,3 V LDO + 4,7 kΩ pull-upy na SDA/SCL. Silkscreen říká „MPU6050", v praxi často osazeno **MPU-6500** (WHO_AM_I=0x70) — firmware detekuje a akceptuje obě varianty. Zelená status LED na modulu odpájet (1,44 mA always-on). |
-| **[LaskKit GeB Li-Ion 18650 1S1P 3,7 V 3200 mAh](https://www.laskakit.cz/geb-li-ion-baterie-1x18650-1s1p-3-7v-3200mah/)** | ✅ zvolená baterie | 18650 cell s integrovanou ochranou (over-discharge / over-current). Nabíjí se přes USB-C C3-LPKit (on-board charger). JST-PH 2.0 konektor. |
-| **Spínač / tlačítko v sérii s baterií** | ✅ mám | Rozepíná napájení z baterie — slouží k vynucenému cold bootu (zachycení nové baseline po instalaci, viz boot notifikace). Bez fyzického přístupu k RST tlačítku po zavření krabičky. |
-| **DuPont kabely female-female ×4** | ✅ mám | propojení MPU ↔ ESP (VCC, GND, SDA, SCL) |
-| **3D tištěná krabička** | ✅ hotová | OpenSCAD model `3dprint/`, průzor ve víku pro NeoPixel indikaci. MPU musí být pevně přichycena k vratům, ne k rámu (jinak měří pohyb rámu, ne dveří). |
+| Položka | Cena | Pozn. |
+|---|---:|---|
+| **[LaskaKit ESP32-C3-LPKit v4](https://www.laskakit.cz/laskkit-esp-12-board/)** (board ID `esp32-c3-devkitm-1`) | 298 Kč | ESP32-C3 (RISC-V), nativní USB-CDC bez externího USB-Serial čipu, on-board WS2812 NeoPixel RGB LED (GPIO9), JST-PH 2.0 + integrovaný LiPo charger, low-quiescent LDO se softwarovým `PERIPH_EN` switchem (GPIO4) pro perif. rail. Sleep proud naměřeno **19 µA** — viz [Spotřeba](#spotřeba). **Pozor: existují 2 varianty desky** — jedna s integrovanou PCB anténou (plug-and-play), druhá s u.FL/IPEX konektorem pro externí anténu + pigtail (řádky níže). |
+| **[Pigtail U.FL ↔ SMA female, 15 cm](https://www.laskakit.cz/pigtail-u-fl-sma-female--kabel-1-13mm--15cm/)** *(jen u externí antény)* | 38 Kč | Propojení on-board U.FL/IPEX konektoru s externí anténou přes SMA spoj. Nutné jen u varianty desky bez integrované PCB antény. |
+| **[Anténa 2,4 GHz 10 cm SMA](https://www.laskakit.cz/antena-10cm-2-4g/)** *(jen u externí antény)* | 88 Kč | NiceRF SW2400-ZD115. Šroubuje se na pigtail. Lepší dosah než on-board PCB anténa — vhodné pokud je AP daleko nebo přes zdi. |
+| **[GY-521 MPU6050 / MPU6500](https://www.laskakit.cz/arduino-gyroskop-a-akcelerometr-gy-521--mpu6050/)** (akcelerometr) | 98 Kč | 6-axis IMU, I²C adresa `0x68`, on-board 3,3 V LDO + 4,7 kΩ pull-upy na SDA/SCL. Silkscreen říká „MPU6050", v praxi často osazeno **MPU-6500** (WHO_AM_I=0x70) — firmware detekuje a akceptuje obě varianty. Zelená status LED na modulu odpájet (1,44 mA always-on). |
+| **[LaskKit GeB Li-Ion 18650 1S1P 3,7 V 3200 mAh](https://www.laskakit.cz/geb-li-ion-baterie-1x18650-1s1p-3-7v-3200mah/)** | 188 Kč | 18650 cell s integrovanou ochranou (over-discharge / over-current). Nabíjí se přes USB-C C3-LPKit (on-board charger). JST-PH 2.0 konektor. |
+| **Spínač / tlačítko v sérii s baterií** | ~20 Kč | Rozepíná napájení z baterie — slouží k vynucenému cold bootu (zachycení nové baseline po instalaci, viz boot notifikace). Bez fyzického přístupu k RST tlačítku po zavření krabičky. |
+| **Šroubky (M3 + M2.5)** | ~20 Kč | 4× M3 imbus pro víko krabičky + 2× M2.5 self-tap pro ESP modul + 2× M2.5 pro MPU. |
+| **3D tištěná krabička** | ~30 Kč | OpenSCAD model `3dprint/`, průzor ve víku pro NeoPixel indikaci. MPU musí být pevně přichycena k vratům, ne k rámu (jinak měří pohyb rámu, ne dveří). Cena materiálu (PLA, ~30 g). |
+
+Propojení MPU ↔ ESP: 4 drátky (VCC, GND, SDA, SCL) připájené přímo na pájecí pady — bez DuPont konektoru, pevnější vůči vibracím.
+
+**Celkem:** ~660 Kč (s integrovanou PCB anténou) / ~790 Kč (s externí anténou).
 
 ### Pin allocation (LaskaKit ESP32-C3-LPKit v4 — aktuální)
 
@@ -286,94 +292,3 @@ Otázka: jak se mění životnost, pokud probouzím častěji? Předpoklad: poč
 
 Při naměřeném sleep proudu 19 µA (= 0,46 mAh/den) je projekce realistická — wake interval má reálný dopad: 5 min = 1,74 r, 30 min = 2,00 r. Self-discharge zůstává nepřekročitelný floor.
 
----
-
-## Hardware gotchas
-
-1. **Local DNS nepřekládá public domény** — vždy `dns_setserver()` na 1.1.1.1 + 8.8.8.8 hned po WiFi connect (přes `lwip/dns.h`). Mnoho domácích routerů (např. 192.168.x.1) má jen interní zóny, public domény nepřeloží.
-2. **`analogRead() × 3,3 / 4095` má ~4 % chybu** — vždy použít `analogReadMilliVolts()` (vnitřně volá `esp_adc_cal_raw_to_voltage()` s factory eFuse Vref). `VBAT_CALIBRATION = 1.000`.
-3. **Při USB connected nelze spolehlivě měřit SoC** — on-board charger drží 4,2 V v CV phase, ESP vidí výstup chargeru, ne pouze baterii. Pro field deployment OK (USB jen příležitostně).
-4. **POSIX TZ pro Prahu**: `CET-1CEST,M3.5.0,M10.5.0/3` (auto DST).
-5. **USB-CDC enumeration po deep sleep** trvá 1–2 s. Pozdější `Serial` prints se objeví; brzké jsou ztracené (acceptable trade-off pro debug).
-6. **Wake spike s WiFi až 200 mA** — multimetr na 20 mA range vyhoří pojistku. Pro měřicí kapitolu použít 200 mA range nebo 10A bezfusový port. Viz USAGE.md sekce LED pro vizuální indikaci, je-li potřeba zachytit timing bez monitoru.
-7. **První sample po MPU wake je outlier** — vždy zahodit, brát od druhého.
-8. **Půlnoc v okně 22:00–06:00** — použít `(hour >= 22 || hour < 6)`, ne `&&` (vždy false).
-9. **Magnetické / vibrační rušení garážových motorů** — pokud bude problém, vložit po wake `delay(5 s)` a přeměřit, nebo filtrovat měření s |a| daleko od 1g.
-10. **MPU baseline „closed"** — zachycen při cold bootu, předpoklad vrata zavřená. Po vypnutí/zapnutí spínače musí být vrata zavřená, jinak posun reference.
-11. **GPIO9 je BOOT strapping pin C3**, na C3-LPKit obsazený NeoPixel DIN. WS2812 je high-Z dokud chip nezacne řídit → boot OK. Nikdy ale na GPIO9 nepřipojuj externí pull-down, jinak chip nenabootuje.
-12. **GPIO4 PERIPH_EN** — `gpio_hold_en` udržuje stav přes deep sleep. Bez něj by GPIO floatovala a perif rail by zůstal napájený.
-
----
-
-## Budoucí rozšíření (v2)
-
-### Top priorita — pokud bude pokračování projektu
-- **AP config mode + NVS settings** — když WiFi nejede / se mění, zařízení vytvoří hotspot „garage-config", uživatel přes browser na `192.168.4.1` zadá nové credentials, ESP uloží do **NVS** (Non-Volatile Storage ve flash, přežije power-off). Eliminuje rekompilaci `secrets.h`. Stejný mechanismus pro threshold, window times, ntfy topic. Rozdíl mezi „technický projekt" a „použitelný produkt".
-- **Magnetic reed switch jako primary detector** — pasivní spínač = nulová spotřeba pro detekci, MPU jen jako záloha / „magnetic field nesedí, něco není OK". Pro binary open/closed scénář spolehlivější než tilt + řádově lepší power budget.
-- **OTA firmware updates** — update bez fyzického přístupu k zařízení. ESP32 podporuje, využíváme WiFi co stejně máme. Užitečné jakmile zařízení visí na vratech.
-
-### Nice-to-have
-- **Recovery notifikace** — po vyřešení chyby poslat „sensor opět OK". Uživatel má čistý mental model „byl problém / je vyřešeno".
-- **Hard low-battery alert (jednou)** — Vbat < 3,3 V → poslední šance zpráva před tím, než ESP zhasne. Aktuální heartbeat už battery % obsahuje, takže tohle je jen safety net.
-- **Battery health tracking** — log Vbat samples do NVS, počítej kapacitní degradaci 18650 v čase. Po roce uvidíš jestli baterka zestárla nebo drží.
-- **Vacation mode** — temporary 24/7 alert (ne jen 22-06). Aktivované přes ntfy příkaz nebo dočasně do NVS.
-
-### Spíše ne (pro úplnost — proč to nedává smysl)
-- **Ultrasonic distance / PIR motion** — jiný use case (auto v garáži / zloděj uvnitř). Není to evoluce „detekce otevřených vrat", spíš samostatný projekt.
-- **Adaptive sleep duration** — spočítáno: ~0,8 mAh/den úspora vs. self-discharge ~30 mAh/měsíc. Low value, ladění toho času nestojí.
-- **Solar power** — overkill pro nabíjení 1× ročně. Solar dává smysl jen pokud životnost klesne pod ~3 měsíce nebo zařízení nemá fyzický přístup.
-- **Multi-door support** — málokdo má víc garáží. Pokud by, lze řešit přes víc samostatných zařízení.
-
----
-
-## Debug — vývojářské nástroje
-
-Každý debug modul je samostatně flashovatelný firmware testující jednu věc izolovaně. Slouží pro ladění a diagnostiku během vývoje (ne pro deployment).
-
-### Příkazy
-
-| Modul | Příkaz |
-|---|---|
-| **c3led** (NeoPixel test) | `pio run -e c3led -t upload -t monitor` |
-| **c3wifi** (WiFi RSSI / anténa test) | `pio run -e c3wifi -t upload -t monitor` |
-| **c3mpu** (MPU6050/6500 bring-up) | `pio run -e c3mpu -t upload -t monitor` |
-| **c3power** (deep sleep + WiFi POST cyklus pro power měření) | `pio run -e c3power -t upload -t monitor` |
-| **c3sleep** (idle-only sleep bez WiFi, čisté ESP baseline) | `pio run -e c3sleep -t upload -t monitor` |
-| Jen build (bez upload) | `pio run -e <env>` |
-| Vyčistit build cache | `pio run -e <env> -t clean` |
-
-### Co každý modul dělá
-
-**`c3led`** — cyklický NeoPixel barevný test. Ověření že WS2812 na GPIO9 funguje a PERIPH_EN switch na GPIO4 zapne perif rail.
-
-**`c3wifi`** — WiFi scan + connect + RSSI loop. Slouží pro ověření antény (built-in PCB vs externí přes u.FL/IPEX pigtail) a kvality signálu v cílové instalaci.
-
-**`c3mpu`** — MPU bring-up: I2C scan, WHO_AM_I detekce, accel + teplota loop. Akceptuje 0x68 (MPU-6050) i 0x70 (MPU-6500) s adekvátním teplotním vzorcem.
-
-**`c3power`** — full power cycle test. Deep sleep 30 s → wake → WiFi POST na ntfy → red/green LED → sleep. Dual log (USB-CDC + UART0) ať jde monitorovat i bez USB. Pro multimetr measurement workflow.
-
-**`c3sleep`** — varianta `c3power` bez WiFi. Měření čistého ESP+NeoPixel active proudu a deep sleep baseline.
-
-### Přidání nového debug modulu
-
-1. `mkdir debug/<jmeno> && touch debug/<jmeno>/main.cpp`
-2. V `platformio.ini` přidat:
-   ```ini
-   [env:<jmeno>]
-   build_src_filter = -<*> +<../debug/<jmeno>/main.cpp>
-   ```
-3. `pio run -e <jmeno> -t upload -t monitor`
-
-Sdílená konfigurace (board, port, build_flags) je v `[env]` sekci, neopisovat.
-
----
-
-## TODO
-
-### Před field deploymentem (battery-powered)
-- [ ] **Odpájet GY-521 zelenou power LED** — naměřeno 1,44 mA always-on
-- [ ] 3D tištěný / lepený držák MPU na vrata
-- [ ] Test 1 týden v reálných podmínkách, sledovat false positives z větru
-- [ ] Doladit threshold 60° / 40° pokud místní prostředí vyžaduje
-- [ ] Připnout PIO platform version v `platformio.ini` (`platform = espressif32@^6.5.0`)
-- [ ] AP config mode (přes double-tap RST) + NVS settings — viz Budoucí rozšíření
