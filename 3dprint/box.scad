@@ -35,7 +35,7 @@ mpu_w           = 15.0;       // along Y
 mpu_hole_sp     = 15.0;       // hole spacing on +Y long edge (along X) — MEASURED
 mpu_hole_inset  = 2.5;        // hole inset from +Y edge
 
-// ===== module standoffs (M2.5 self-tap) =====
+// ===== module standoffs (M2 self-tap; pilot 2.1 z puvodniho M2.5 designu — v PETG drzi i M2) =====
 standoff_dia        = 5.0;
 standoff_h          = 5.0;
 standoff_pilot      = 2.1;

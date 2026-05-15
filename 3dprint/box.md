@@ -7,7 +7,7 @@ Working notes for `box.scad`. The .scad file has inline comments on every parame
 Spodek (`base`):
 - **Battery cradle** along -Y half of the inner space, X axis. 64 mm open U-channel + 6 mm closed ring at +X end (battery stop).
 - **4 lid screw posts** in corners (M3 self-tap, Ø 7 mm, pilot 2.5 mm).
-- **ESP module mounts**: 2 standoffs (Ø 5, h 5, M2.5 pilot) on +X edge of PCB + 1 central under-support (Ø 4, h 5) on -X (USB-C) edge.
+- **ESP module mounts**: 2 standoffs (Ø 5, h 5, 2.1 mm pilot — M2 self-tap; original design byl pro M2.5, M2 v PETG sedí pohodlně) on +X edge of PCB + 1 central under-support (Ø 4, h 5) on -X (USB-C) edge.
 - **MPU6050 standoffs**: 2 on +Y edge of PCB, shifted toward +Y wall.
 - **USB-C cutout** in -X wall, centered on ESP Y.
 - **Antenna hole** Ø 6.5 mm in +X wall (opposite USB-C), Z offset +5 mm above USB-C center — sedí na závit RP-SMA / SMA bulkhead konektoru.
@@ -73,13 +73,13 @@ ESP-related dimensions are MEASURED from a real board. The rest are educated gue
 4. Drop battery into cradle: tilt with +X end first, insert into closed ring section, then lower -X end into the U-channel.
 5. Solder wires to rocker switch (outside the box), then slide switch into the slot in -X wall from above.
 6. Optionally: thread one or two zip-ties through the tunnels, over the battery, lock on -Y side.
-7. Screw ESP module to its two +X-edge standoffs (M2.5 self-tap, ~5–6 mm length).
-8. Screw MPU6050 to its two +Y-edge standoffs.
+7. Screw ESP module to its two +X-edge standoffs (M2 self-tap, ~5–6 mm length).
+8. Screw MPU6050 to its two +Y-edge standoffs (M2 self-tap).
 9. Place lid (lid half-cradle sedí ve středu baterie). Tighten 4 M3 cap screws.
 
 ## Print notes
 
-- **Material**: PETG recommended for the ring + lid cradle (some flex needed). PLA works but is more brittle on thin overhangs.
+- **Material**: PETG (used for current build, ~60 g per set base+lid). PETG drží lépe ohyb ring sekce + lid cradle. PLA jde taky, ale je křehčí v tenkých přesahech.
 - **Layer height**: 0.2 mm fine for most parts; closed ring section at +X has a ~10 mm bridge at the top (battery diameter); use bridging-friendly settings.
 - **Orientation**:
   - Base: flat on bed (floor down). No supports needed except inside the closed ring at +X end (small bridge, usually OK without).

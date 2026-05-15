@@ -88,8 +88,8 @@ WAKE CYCLE (každých 5 min)
 | **[GY-521 MPU6050 / MPU6500](https://www.laskakit.cz/arduino-gyroskop-a-akcelerometr-gy-521--mpu6050/)** (akcelerometr) | 98 Kč | 6-axis IMU, I²C adresa `0x68`, on-board 3,3 V LDO + 4,7 kΩ pull-upy na SDA/SCL. Silkscreen říká „MPU6050", v praxi často osazeno **MPU-6500** (WHO_AM_I=0x70) — firmware detekuje a akceptuje obě varianty. Zelená status LED na modulu odpájet (1,44 mA always-on). |
 | **[LaskKit GeB Li-Ion 18650 1S1P 3,7 V 3200 mAh](https://www.laskakit.cz/geb-li-ion-baterie-1x18650-1s1p-3-7v-3200mah/)** | 188 Kč | 18650 cell s integrovanou ochranou (over-discharge / over-current). Nabíjí se přes USB-C C3-LPKit (on-board charger). JST-PH 2.0 konektor. |
 | **Spínač / tlačítko v sérii s baterií** | ~20 Kč | Rozepíná napájení z baterie — slouží k vynucenému cold bootu (zachycení nové baseline po instalaci, viz boot notifikace). Bez fyzického přístupu k RST tlačítku po zavření krabičky. |
-| **Šroubky (M3 + M2.5)** | ~20 Kč | 4× M3 imbus pro víko krabičky + 2× M2.5 self-tap pro ESP modul + 2× M2.5 pro MPU. |
-| **3D tištěná krabička** | ~30 Kč | OpenSCAD model `3dprint/`, průzor ve víku pro NeoPixel indikaci. MPU musí být pevně přichycena k vratům, ne k rámu (jinak měří pohyb rámu, ne dveří). Cena materiálu (PLA, ~30 g). |
+| **Šroubky (M3 + M2)** | ~20 Kč | 4× M3 imbus pro víko krabičky + 2× M2 self-tap pro ESP modul + 2× M2 pro MPU. |
+| **3D tištěná krabička** | ~30 Kč | OpenSCAD model `3dprint/`, průzor ve víku pro NeoPixel indikaci. MPU musí být pevně přichycena k vratům, ne k rámu (jinak měří pohyb rámu, ne dveří). Cena materiálu (PETG, ~60 g × ~0,5 Kč/g). |
 
 Propojení MPU ↔ ESP: 4 drátky (VCC, GND, SDA, SCL) připájené přímo na pájecí pady — bez DuPont konektoru, pevnější vůči vibracím.
 
