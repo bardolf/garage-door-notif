@@ -256,6 +256,32 @@ Pro PoC akceptovatelné. Pro **~1 rok mezi nabíjeními** je nutná migrace na d
 - ✅ GY-521 zelená LED — naměřeno 1,44 mA always-on, **odpájet před deploymentem**
 - ✅ Vbat měření: `analogReadMilliVolts()` s eFuse calibration → chyba <0,5 % vs multimetr (žádný externí faktor netřeba)
 
+### Naměřené hodnoty (LaskaKit ESP32-C3-LPKit v4)
+
+Setup: baterie přes JST → multimetr v sérii → C3-LPKit v4 + GY-521 (zelená LED odpájena, MPU napájena přes `PERIPH_EN` rail = GPIO4). Firmware: `debug/c3sleep/main.cpp` (`AWAKE_HOLD_MS = 5000`, `SLEEP_DURATION_S = 30`, NeoPixel brightness 40/255 jasně červená). `gpio_hold_en(GPIO4)` drží `PERIPH_EN=LOW` přes deep sleep → MPU a NeoPixel rail odpojený.
+
+| Konfigurace | Active hold | Deep sleep | Pozn. |
+|---|---|---|---|
+| C3-LPKit v4 + GY-521 (NeoPixel on) | **24 mA** | **19 µA** | MPU napájena z PERIPH_EN, neuspána přes I²C |
+
+Active proud (24 mA) = ESP32-C3 active ~10 mA + NeoPixel ~10 mA + MPU6500 active ~4 mA. Při deep sleep `PERIPH_EN=LOW` odřízne NeoPixel i MPU rail → vidíš čistě C3 + LDO + charger IC quiescent.
+
+### Porovnání FireBeetle vs. LaskaKit C3-LPKit v4
+
+| Metrika | FireBeetle (LED odpájena) | C3-LPKit v4 | Zlepšení |
+|---|---:|---:|---:|
+| Active (5 s hold, LED on) | 36,5 mA | 24 mA | **−34 %** |
+| Deep sleep | 470 µA | 19 µA | **−96 % (25× méně)** |
+| Sleep mAh/den | 11,3 | **0,46** | −24× |
+| Sleep life (1000 mAh) | ~88 dní | ~2 200 dní (~6 let)* | |
+| Sleep life (18650 3200 mAh) | ~283 dní | ~7 000 dní (~19 let)* | |
+
+*Pure-sleep teoretické maximum (bez wake events). V praxi limitované self-discharge a kapacitní degradací — viz Wake interval tabulka níže.
+
+**Co C3 vyhrává:** absence CH340 USB-Serial čipu (~150–300 µA leak) a moderní low-quiescent LDO. Hardware-side limit FireBeetle (~430 µA) na C3 zmizel; sleep proud je teď v řádu, kde dominuje **self-discharge baterie**, ne deska.
+
+**Co C3 nevyhrává:** active spotřeba CPU je nižší ale ne dramaticky (RISC-V vs Xtensa dual-core), WiFi peak je stejný řád (~150–200 mA). Migraci ospravedlňuje téměř výhradně sleep proud.
+
 ### Wake interval vs. životnost (projekce pro ESP32-C3)
 
 Otázka: jak se mění životnost, pokud probouzím častěji? Předpoklad: počet odeslaných zpráv (alerty + heartbeat) zůstává konstantní ~5/den, mění se jen frekvence MPU read cyklů bez WiFi.
@@ -263,7 +289,7 @@ Otázka: jak se mění životnost, pokud probouzím častěji? Předpoklad: poč
 **Vstupy** (z naměřených / teoretických hodnot výše):
 - Wake bez WiFi: 50 mA × 0,2 s = **0,00278 mAh/wake**
 - WiFi event: 80 mA × 5 s = 0,111 mAh × 5/den = **0,56 mAh/den**
-- Sleep ESP32-C3 + MPU sleep cíl ~20 µA × 24 h = **0,48 mAh/den**
+- Sleep ESP32-C3 + MPU rail off (PERIPH_EN=LOW) **naměřeno 19 µA** × 24 h = **0,46 mAh/den**
 - Self-discharge 18650 (3 %/měs ze 3200 mAh) = **3,2 mAh/den**
 - Kapacita: 3200 mAh
 
@@ -287,6 +313,8 @@ Otázka: jak se mění životnost, pokud probouzím častěji? Předpoklad: poč
 **Caveats:** kalkulace neuvažují kapacitní degradaci (~3–5 %/r), chlad v zimě (−20–30 % efektivní kapacity) ani stuck-open scénář (vrata nechaná otevřená přes noc → ~120 alertů přes rate-limit → ~13 mAh extra v jedné noci). Reálná životnost bude o 20–40 % nižší.
 
 Na **aktuálním FireBeetle** (sleep 0,47 mA = 11,3 mAh/den) je tento výpočet bezpředmětný — sleep proud desky 3× převyšuje self-discharge a wake interval mizí v šumu (1 min vs. 30 min = jen ~25 % rozdíl, oba ~6–7 měsíců).
+
+**Na C3-LPKit v4** (sleep 19 µA = 0,46 mAh/den naměřeno) je tahle projekce konečně realistická — sleep proud klesl ~25× a tabulka výše přestává být teoretická. Wake interval má teď reálný dopad: 5 min = 1,74 r, 30 min = 2,00 r. Self-discharge zůstává nepřekročitelný floor.
 
 ---
 
