@@ -59,7 +59,7 @@ usb_h           = 6.0;
 // Z posunuto vys nez USB-C — bulkhead konektor potrebuje misto pro matku/podlozku
 // na vnitrni strane a aby byl dal od podlahy / baterie.
 // 6.2 mm sedi na zavit RP-SMA / SMA bulkhead konektoru.
-ant_hole_dia    = 6.2;
+ant_hole_dia    = 6.5;
 ant_hole_z_lift = 5.0;   // o kolik vyse nez usb_z_center (mm)
 
 // ===== floor mounting holes (4× Ø 3 mm wood screw, countersunk inside the box) =====
@@ -76,10 +76,11 @@ mount_y_offset    = 6.0;       // hole center distance from outer Y wall
 // Solder wires first, then drop switch into the slot from above; lid closes it.
 switch_w        = 20.0;       // cutout width along Y (along the -X wall)
 switch_h        = 7.0;        // cutout height along Z (slot opens to top)
-switch_y_offset = 0;          // shift from USB-C Y center (mm); + = toward +Y
+switch_y_offset = 2;          // shift from USB-C Y center (mm); + = toward +Y (k okraji)
 
-// ===== lid half-cradle at -X (wire) end of battery — mirrors base U-channel =====
-// Fully encircles the battery in this section + acts as orientation key vs +X ring.
+// ===== lid half-cradle, centered along battery length =====
+// Posunuto do stredu baterie (puvodne na -X konci), aby nekolidovalo s vodici
+// na obou koncich clanku. Drzi clanek dolu v U-kanalu.
 lid_cradle_len   = 10.0;
 
 // ===== variant C: zip-tie tunnels through cradle (under battery) =====
@@ -92,10 +93,7 @@ esp_support_dia            = 4.0;   // MEASURED
 esp_support_h              = 5.0;   // same as mounting standoff_h — MEASURED
 esp_support_dx_from_mount  = 26.0;  // X dist from ESP mount hole (toward USB-C) — MEASURED
 
-// ===== ESP lid pressure pin (single, protects PCB from USB-C insertion force) =====
-esp_lid_pin_dia  = 4.0;       // MEASURED
-esp_lid_pin_dx   = 31.0;      // X dist from mount hole to pin (toward USB-C) — MEASURED
-esp_lid_pin_gap  = 5.5;       // Z gap between under-support top and lid pin bottom — MEASURED
+// ESP lid pressure pin: ZRUSENO — kolidoval by s rocker switch v -X stene.
 
 // ===== LED viewing hole in lid (NeoPixel on ESP module shines through) =====
 led_hole_dia              = 4.0;   // priezor pro indikacni RGB LED
@@ -163,11 +161,6 @@ zip_x2_g       = batt_x_start_g + batt_len * 0.75;
 // ESP under-support (single pillar on ESP Y center)
 esp_center_y_g   = wall + mod_y0 + esp_w/2;
 esp_support_x_g  = wall + esp_hole_x - esp_support_dx_from_mount;
-
-// ESP lid pressure pin (single, on ESP Y center)
-esp_lid_pin_x_g  = wall + esp_hole_x - esp_lid_pin_dx;
-// pin length: spans from lid bottom down to (under-support top + gap)
-esp_lid_pin_h    = outer_z_base - floor_thk - esp_support_h - esp_lid_pin_gap;
 
 // LED viewing hole (through lid, above NeoPixel on ESP module)
 led_hole_x_g     = wall + esp_hole_x - led_x_from_mount;
@@ -293,21 +286,20 @@ module lid() {
     union() {
       cube([outer_x, outer_y, lid_thk]);
 
-      // Lid half-cradle: 10 mm long block at -X end of battery with a half-cyl cut
-      // (mirrors the base U-channel; together with +X ring fully encircles battery)
+      // Lid half-cradle: 10 mm long block centered along battery length, with
+      // a half-cyl cut. Drzi clanek dolu; konce baterie zustanou volne pro vodice.
       lid_cradle_drop = outer_z_base - batt_axis_z_g;  // how far cradle hangs below lid
+      lid_cradle_x0   = batt_x_start_g + (batt_len - lid_cradle_len) / 2;
       difference() {
-        translate([batt_x_start_g, batt_axis_y_g - cradle_w/2, -lid_cradle_drop])
+        translate([lid_cradle_x0, batt_axis_y_g - cradle_w/2, -lid_cradle_drop])
           cube([lid_cradle_len, cradle_w, lid_cradle_drop]);
-        translate([batt_x_start_g - EPS, batt_axis_y_g, -lid_cradle_drop])
+        translate([lid_cradle_x0 - EPS, batt_axis_y_g, -lid_cradle_drop])
           rotate([0, 90, 0])
             cylinder(d = batt_dia + 2*batt_clearance,
                      h = lid_cradle_len + 2*EPS);
       }
 
-      // ESP pressure pin (single, protects PCB from USB-C insertion force)
-      translate([esp_lid_pin_x_g, esp_center_y_g, -esp_lid_pin_h])
-        cylinder(d = esp_lid_pin_dia, h = esp_lid_pin_h);
+      // ESP pressure pin: zruseno (kolize s rocker switch).
     }
     // Through screw holes with counterbore
     for (px = [screw_inset, outer_x - screw_inset])

@@ -72,31 +72,44 @@ WAKE CYCLE (každých 5 min)
 
 | Položka | Stav | Pozn. |
 |---|---|---|
-| **DFRobot FireBeetle ESP32-E V1.0** (board ID `dfrobot_firebeetle2_esp32e`) | ✅ aktuální PoC | ESP32 + WiFi + integrovaný TP4056 charger + JST-PH 2.0. CH340 USB-Serial má ~430 µA leak — viz [Spotřeba](#spotřeba). |
-| **[LaskKit ESP-12 board](https://www.laskakit.cz/laskkit-esp-12-board/)** | 🔄 plánovaná migrace | ESP32-C3, nativní USB-CDC (žádný CH340), cíl ~20 µA sleep — viz [Migrace na ESP32-C3](#migrace-na-esp32-c3). **Pozor: existují 2 varianty desky** — jedna s integrovanou PCB anténou (plug-and-play), druhá s u.FL/IPEX konektorem pro **externí anténu + pigtail kabel** (nutno dokoupit zvlášť). Při objednávce ověřit kterou variantu máš; pokud externí, dokoupit anténu 2,4 GHz + u.FL pigtail. |
-| **GY-521 MPU6050** (akcelerometr) | ✅ funguje | 6-axis IMU, I²C, on-board 3,3 V LDO + 4,7k pull-upy |
-| **[LaskKit GeB Li-Ion 18650 1S1P 3,7 V 3200 mAh](https://www.laskakit.cz/geb-li-ion-baterie-1x18650-1s1p-3-7v-3200mah/)** | ✅ zvolená baterie | 18650 cell s integrovanou ochranou (over-discharge / over-current). Nabíjí se přes USB FireBeetle (TP4056). Ověřit JST-PH 2.0 konektor / případně zalisovat. |
+| **[LaskaKit ESP32-C3-LPKit v4](https://www.laskakit.cz/laskkit-esp-12-board/)** (board ID `esp32-c3-devkitm-1`) | ✅ aktuální PoC | ESP32-C3 (RISC-V), nativní USB-CDC bez externího USB-Serial čipu, on-board WS2812 NeoPixel RGB LED (GPIO9), JST-PH 2.0 + integrovaný LiPo charger, low-quiescent LDO se softwarovým `PERIPH_EN` switchem (GPIO4) pro perif. rail. Sleep proud naměřeno **19 µA** — viz [Spotřeba](#spotřeba). **Pozor: existují 2 varianty desky** — jedna s integrovanou PCB anténou (plug-and-play), druhá s u.FL/IPEX konektorem pro **externí anténu + pigtail kabel** (nutno dokoupit zvlášť). Při objednávce ověřit kterou variantu máš; pokud externí, dokoupit anténu 2,4 GHz + u.FL pigtail. |
+| **GY-521 MPU6050 / MPU6500** (akcelerometr) | ✅ funguje | 6-axis IMU, I²C adresa `0x68`, on-board 3,3 V LDO + 4,7 kΩ pull-upy na SDA/SCL. Silkscreen říká „MPU6050", v praxi často osazeno **MPU-6500** (WHO_AM_I=0x70) — firmware detekuje a akceptuje obě varianty. Zelená status LED na modulu odpájet (1,44 mA always-on). |
+| **[LaskKit GeB Li-Ion 18650 1S1P 3,7 V 3200 mAh](https://www.laskakit.cz/geb-li-ion-baterie-1x18650-1s1p-3-7v-3200mah/)** | ✅ zvolená baterie | 18650 cell s integrovanou ochranou (over-discharge / over-current). Nabíjí se přes USB-C C3-LPKit (on-board charger). JST-PH 2.0 konektor. |
+| **Spínač / tlačítko v sérii s baterií** | ✅ mám | Rozepíná napájení z baterie — slouží k vynucenému cold bootu (zachycení nové baseline po instalaci, viz boot notifikace). Bez fyzického přístupu k RST tlačítku po zavření krabičky. |
 | **DuPont kabely female-female ×4** | ✅ mám | propojení MPU ↔ ESP (VCC, GND, SDA, SCL) |
-| **Lepidlo / 3D tištěný držák** | 🟡 vyřešit | MPU musí být pevně přichycený k vratům, ne k rámu |
+| **3D tištěná krabička** | ✅ hotová | OpenSCAD model `3dprint/`, průzor ve víku pro NeoPixel indikaci. MPU musí být pevně přichycena k vratům, ne k rámu (jinak měří pohyb rámu, ne dveří). |
 
-### Pin allocation
+### Pin allocation (LaskaKit ESP32-C3-LPKit v4 — aktuální)
 
 | GPIO | Funkce | Pozn. |
 |---|---|---|
-| 2 | onboard LED | output, active HIGH |
-| 21 | I²C SDA → GY-521 SDA | default ESP32 I²C |
-| 22 | I²C SCL → GY-521 SCL | default ESP32 I²C |
-| 34 | ADC1 — Vbat sense | on-board divider ×2, použít `analogReadMilliVolts()` |
+| 0 | ADC — Vbat sense | on-board divider ×1.769, použít `analogReadMilliVolts()` (viz silkscreen v4.0) |
+| 4 | `PERIPH_EN` — power switch perif. rail | HIGH = napájena MPU + NeoPixel; LOW = oboje off. `gpio_hold_en` pro persistenci přes deep sleep |
+| 6 | I²C SDA → GY-521 SDA | volný GPIO bez kolize se strapping/USB/UART |
+| 7 | I²C SCL → GY-521 SCL | volný GPIO bez kolize |
+| 9 | on-board WS2812 NeoPixel (RGB LED) | jediný indikátor stavu; GPIO9 by jinak byl BOOT strapping, na C3-LPKit obsazený LED |
+| 20 | UART0 RX | volné, lze využít pro externí USB-UART monitor při battery měření |
+| 21 | UART0 TX | volné, lze využít pro externí USB-UART monitor při battery měření |
 
-### Zapojení MPU6050 ↔ ESP
+Obsazené čipem / deskou: USB-C přes nativní USB-CDC (GPIO18/19), 32 kHz krystal (interní RC), Flash (GPIO11–17 interní v ESP32-C3-MINI-1 modulu).
 
-| GY-521 pin | FireBeetle pin |
-|---|---|
-| VCC | 3V3 |
-| GND | GND |
-| SDA | GPIO21 |
-| SCL | GPIO22 |
-| INT, AD0, XCL, XDA | nezapojeno (timer wake, ne motion; AD0=LOW → adresa 0x68) |
+### Zapojení MPU6050 / MPU6500 ↔ ESP32-C3-LPKit v4
+
+GY-521 modul napájíme **z PERIPH_EN railu** (přes GPIO4 power switch) — v deep sleep tak MPU dostane 0 V a nemusíme ji explicitně uspávat přes I²C kvůli sleep proudu.
+
+| GY-521 pin | C3-LPKit pin | Pozn. |
+|---|---|---|
+| VCC | 3V3 | jakýkoli 3V3 pin na headeru — všechny jsou za PERIPH_EN switchem |
+| GND | GND | jakýkoli GND pin |
+| SDA | GPIO6 | I²C data |
+| SCL | GPIO7 | I²C clock |
+| AD0 | nezapojeno | → I²C adresa **0x68** (default pull-down na GY-521 modulu) |
+| INT | nezapojeno | timer wake, ne motion interrupt |
+| XCL, XDA | nezapojeno | aux I²C master pro magnetometr — nepoužívá se |
+
+Pull-up rezistory pro I²C jsou integrované na GY-521 modulu (4.7 kΩ na SDA i SCL), externí netřeba.
+
+**MPU chip:** silkscreen modulů obvykle říká `MPU6050`, ale GY-521 se prodávají s oběma — MPU-6050 (WHO_AM_I=0x68) i MPU-6500 (0x70). Firmware akceptuje 0x68/0x70/0x71/0x73 (MPU-6050/6500/9250/9255), register layout je v naší podmnožině (accel + temp) kompatibilní.
 
 ---
 
@@ -194,24 +207,23 @@ curl -s "https://ntfy.sh/milan-garaz-2026-x8kf3pq7vn/json?poll=1&since=1h"
 
 ## Spotřeba
 
-### Teoretická predikce (z původního design doc)
+### Teoretická predikce
 
 | Komponenta | Spotřeba | Pozn. |
 |---|---|---|
-| ESP32 deep sleep | ~13 µA | DFRobot claim pro FireBeetle E |
-| MPU6050 sleep mode | ~5 µA | 99,9 % času |
-| Wake event (no WiFi) | ~50 mA × 200 ms | I²C read MPU |
+| ESP32-C3 deep sleep | ~5–10 µA | datasheet, sám čip |
+| MPU6050/6500 — rail off | 0 µA | PERIPH_EN=LOW odřízne |
+| Wake event (no WiFi) | ~25 mA × ~5 s | MPU read + tilt compute |
 | Alert / heartbeat (s WiFi) | ~80 mA × 5 s | NTP + HTTP POST |
 
 **Denní budget** (předpoklad: 288 wake/den, ~5 alert/heartbeat events/den):
 
 | Položka | Výpočet | Energie/den |
 |---|---|---|
-| ESP32 deep sleep | 24 h × 13 µA × 3,3 V | 1,0 mWh |
-| MPU sleep | 24 h × 5 µA × 3,3 V | 0,4 mWh |
-| 288 wake × 0,2 s | 50 mA × 3,3 V × 57,6 s | 2,6 mWh |
+| ESP32-C3 deep sleep | 24 h × 19 µA × 3,3 V | 1,5 mWh |
+| 288 wake × 5 s | 25 mA × 3,3 V × 1440 s | 33 mWh |
 | 5 WiFi events × 5 s | 80 mA × 3,3 V × 25 s | 1,8 mWh |
-| **Σ teoretický cíl** | | **~6 mWh/den** |
+| **Σ celkem** | | **~36 mWh/den** |
 
 **Teoretické maximum** (čistě výpočet ze spotřeby, ESP32-C3 + odpájené LED):
 
@@ -230,32 +242,6 @@ curl -s "https://ntfy.sh/milan-garaz-2026-x8kf3pq7vn/json?poll=1&since=1h"
 
 ➜ Plánovat **nabíjení 1× ročně** je realistický cíl. „5,5 let" je horní strop matematiky, ne reálné očekávání.
 
-### Naměřené hodnoty (FireBeetle ESP32-E)
-
-Setup: baterie přes JST-PH 2.0 → multimetr v sérii → FireBeetle. Bez USB. `debug/sleep/main.cpp` s `AWAKE_HOLD_MS = 5000`, `SLEEP_DURATION_S = 30`.
-
-| Konfigurace | Active hold | Deep sleep | Pozn. |
-|---|---|---|---|
-| FireBeetle + GY-521 (LED on) | 37,9 mA | **1,91 mA** | LED dominuje |
-| FireBeetle + GY-521 (LED **odpájena**) | 36,5 mA | **0,47 mA** | −1,44 mA z LED |
-| FireBeetle samotný (MPU odpojen) | — | **0,43 mA** | GY-521 v sleep tahala 40 µA |
-
-**Závěr:** ze 430 µA na FireBeetle samotném je **~417 µA leak mimo ESP32 chip** (claim 13 µA). Hlavní podezřelý: **CH340 USB-Serial čip** v suspend modu (typicky 150–300 µA bez USB) + AMS1117 LDO quiescent + drobné peripherály. **Hardware-side limit FireBeetle ESP32-E V1.0**, neopravitelné firmwarem.
-
-**Reálná životnost na FireBeetle při 0,47 mA sleep:**
-- 0,47 mA × 24 h ≈ 11 mAh/den
-- 1000 mAh LiPo → ~88 dní (~3 měsíce)
-- **18650 3200 mAh → ~283 dní (~9 měsíců)**
-
-Pro PoC akceptovatelné. Pro **~1 rok mezi nabíjeními** je nutná migrace na desku bez CH340 (viz [Migrace na ESP32-C3](#migrace-na-esp32-c3)) — bez ní jsme limitovaní na ~9 měsíců i s ideálními podmínkami, v zimě / s degradovanou baterií spadne na ~6 měsíců.
-
-**Co je proven:**
-- ✅ ESP32 deep sleep funguje (FireBeetle E claim 13 µA, fakticky neviditelné při 430 µA limitu desky)
-- ✅ MPU I²C SLEEP funguje (žádná detekovatelná spotřeba navíc, < 10 µA)
-- ✅ GPIO2 LED — programovatelná, off-stav = 0 mA, **netřeba odpájet** (firmware ji prostě nedriverуje HIGH)
-- ✅ GY-521 zelená LED — naměřeno 1,44 mA always-on, **odpájet před deploymentem**
-- ✅ Vbat měření: `analogReadMilliVolts()` s eFuse calibration → chyba <0,5 % vs multimetr (žádný externí faktor netřeba)
-
 ### Naměřené hodnoty (LaskaKit ESP32-C3-LPKit v4)
 
 Setup: baterie přes JST → multimetr v sérii → C3-LPKit v4 + GY-521 (zelená LED odpájena, MPU napájena přes `PERIPH_EN` rail = GPIO4). Firmware: `debug/c3sleep/main.cpp` (`AWAKE_HOLD_MS = 5000`, `SLEEP_DURATION_S = 30`, NeoPixel brightness 40/255 jasně červená). `gpio_hold_en(GPIO4)` drží `PERIPH_EN=LOW` přes deep sleep → MPU a NeoPixel rail odpojený.
@@ -266,23 +252,9 @@ Setup: baterie přes JST → multimetr v sérii → C3-LPKit v4 + GY-521 (zelen�
 
 Active proud (24 mA) = ESP32-C3 active ~10 mA + NeoPixel ~10 mA + MPU6500 active ~4 mA. Při deep sleep `PERIPH_EN=LOW` odřízne NeoPixel i MPU rail → vidíš čistě C3 + LDO + charger IC quiescent.
 
-### Porovnání FireBeetle vs. LaskaKit C3-LPKit v4
+Sleep mAh/den: **19 µA × 24 h = 0,46 mAh/den**. Při 18650 3200 mAh teoretické maximum (jen sleep, bez wake events) ~7 000 dní (~19 let) — v praxi limitováno self-discharge baterie a kapacitní degradací; viz Wake interval tabulka níže.
 
-| Metrika | FireBeetle (LED odpájena) | C3-LPKit v4 | Zlepšení |
-|---|---:|---:|---:|
-| Active (5 s hold, LED on) | 36,5 mA | 24 mA | **−34 %** |
-| Deep sleep | 470 µA | 19 µA | **−96 % (25× méně)** |
-| Sleep mAh/den | 11,3 | **0,46** | −24× |
-| Sleep life (1000 mAh) | ~88 dní | ~2 200 dní (~6 let)* | |
-| Sleep life (18650 3200 mAh) | ~283 dní | ~7 000 dní (~19 let)* | |
-
-*Pure-sleep teoretické maximum (bez wake events). V praxi limitované self-discharge a kapacitní degradací — viz Wake interval tabulka níže.
-
-**Co C3 vyhrává:** absence CH340 USB-Serial čipu (~150–300 µA leak) a moderní low-quiescent LDO. Hardware-side limit FireBeetle (~430 µA) na C3 zmizel; sleep proud je teď v řádu, kde dominuje **self-discharge baterie**, ne deska.
-
-**Co C3 nevyhrává:** active spotřeba CPU je nižší ale ne dramaticky (RISC-V vs Xtensa dual-core), WiFi peak je stejný řád (~150–200 mA). Migraci ospravedlňuje téměř výhradně sleep proud.
-
-### Wake interval vs. životnost (projekce pro ESP32-C3)
+### Wake interval vs. životnost
 
 Otázka: jak se mění životnost, pokud probouzím častěji? Předpoklad: počet odeslaných zpráv (alerty + heartbeat) zůstává konstantní ~5/den, mění se jen frekvence MPU read cyklů bez WiFi.
 
@@ -312,9 +284,7 @@ Otázka: jak se mění životnost, pokud probouzím častěji? Předpoklad: poč
 
 **Caveats:** kalkulace neuvažují kapacitní degradaci (~3–5 %/r), chlad v zimě (−20–30 % efektivní kapacity) ani stuck-open scénář (vrata nechaná otevřená přes noc → ~120 alertů přes rate-limit → ~13 mAh extra v jedné noci). Reálná životnost bude o 20–40 % nižší.
 
-Na **aktuálním FireBeetle** (sleep 0,47 mA = 11,3 mAh/den) je tento výpočet bezpředmětný — sleep proud desky 3× převyšuje self-discharge a wake interval mizí v šumu (1 min vs. 30 min = jen ~25 % rozdíl, oba ~6–7 měsíců).
-
-**Na C3-LPKit v4** (sleep 19 µA = 0,46 mAh/den naměřeno) je tahle projekce konečně realistická — sleep proud klesl ~25× a tabulka výše přestává být teoretická. Wake interval má teď reálný dopad: 5 min = 1,74 r, 30 min = 2,00 r. Self-discharge zůstává nepřekročitelný floor.
+Při naměřeném sleep proudu 19 µA (= 0,46 mAh/den) je projekce realistická — wake interval má reálný dopad: 5 min = 1,74 r, 30 min = 2,00 r. Self-discharge zůstává nepřekročitelný floor.
 
 ---
 
@@ -322,32 +292,16 @@ Na **aktuálním FireBeetle** (sleep 0,47 mA = 11,3 mAh/den) je tento výpočet 
 
 1. **Local DNS nepřekládá public domény** — vždy `dns_setserver()` na 1.1.1.1 + 8.8.8.8 hned po WiFi connect (přes `lwip/dns.h`). Mnoho domácích routerů (např. 192.168.x.1) má jen interní zóny, public domény nepřeloží.
 2. **`analogRead() × 3,3 / 4095` má ~4 % chybu** — vždy použít `analogReadMilliVolts()` (vnitřně volá `esp_adc_cal_raw_to_voltage()` s factory eFuse Vref). `VBAT_CALIBRATION = 1.000`.
-3. **Při USB connected nelze spolehlivě měřit SoC** — TP4056 charger drží 4,2 V v CV phase, ESP vidí výstup chargeru, ne pouze baterii. Pro field deployment OK (USB jen příležitostně).
+3. **Při USB connected nelze spolehlivě měřit SoC** — on-board charger drží 4,2 V v CV phase, ESP vidí výstup chargeru, ne pouze baterii. Pro field deployment OK (USB jen příležitostně).
 4. **POSIX TZ pro Prahu**: `CET-1CEST,M3.5.0,M10.5.0/3` (auto DST).
-5. **CH340 driver na Fedoře**: built-in (`ch341` kernel modul), `/dev/ttyUSB0` rovnou použitelný — žádný `usermod -aG dialout` netřeba.
-6. **CH340 žere ~150–300 µA i bez USB** — známý leak FireBeetle desky, viz [Spotřeba](#spotřeba) výše.
-7. **Použít ADC1 piny (GPIO32–39)** pro Vbat — ADC2 koliduje s WiFi.
-8. **Wake spike s WiFi až 200 mA** — multimetr na 20 mA range vyhoří pojistku. Pro měřicí kapitolu použít 200 mA range nebo 10A bezfusový port.
-9. **První sample po MPU wake je outlier** — vždy zahodit, brát od druhého.
-10. **Půlnoc v okně 22:00–06:00** — použít `(hour >= 22 || hour < 6)`, ne `&&` (vždy false).
-11. **Magnetické / vibrační rušení garážových motorů** — pokud bude problém, vložit po wake `delay(5 s)` a přeměřit, nebo filtrovat měření s |a| daleko od 1g.
-12. **MPU baseline „closed"** — zachycen při cold bootu, předpoklad vrata zavřená. Po výměně baterie / RST musí být vrata zavřená, jinak posun reference.
-
----
-
-## Migrace na ESP32-C3
-
-**Důvod:** FireBeetle ESP32-E má hardware-side leak ~430 µA z CH340 + LDO. ESP32-C3 má **nativní USB-CDC** (žádný externí USB-Serial čip). Typický deep sleep ESP32-C3 + clean board layout: **~5–10 µA chip + ~5 µA peripherály = ~15 µA**. + MPU sleep 5 µA → cíl **~20 µA total**, což odpovídá teoretické predikci.
-
-Objednaná deska: <https://www.laskakit.cz/laskkit-esp-12-board/>
-
-**Migrační kroky (až dorazí):**
-- [ ] Přemapovat GPIO ve firmwaru (SDA/SCL/Vbat — ESP32-C3 má jinou pinovou mapu)
-- [ ] Změnit `board` v `platformio.ini` (z `dfrobot_firebeetle2_esp32e` na `esp32-c3-devkitm-1` nebo specifický LaskKit ID)
-- [ ] Nahrát `sleep` debug, znova provést stejné měření
-- [ ] Cíl: sleep proud ESP32-C3 + MPU sleep ≤ 25 µA (limit rozlišení multimetru na 20 mA range = 0,02–0,03 mA)
-
-Code portability: `Wire.h`, `esp_sleep_*`, `esp_adc_cal`, `WiFi.h` — vše funguje 1:1, jen jiná GPIO čísla.
+5. **USB-CDC enumeration po deep sleep** trvá 1–2 s. Pozdější `Serial` prints se objeví; brzké jsou ztracené (acceptable trade-off pro debug).
+6. **Wake spike s WiFi až 200 mA** — multimetr na 20 mA range vyhoří pojistku. Pro měřicí kapitolu použít 200 mA range nebo 10A bezfusový port. Viz USAGE.md sekce LED pro vizuální indikaci, je-li potřeba zachytit timing bez monitoru.
+7. **První sample po MPU wake je outlier** — vždy zahodit, brát od druhého.
+8. **Půlnoc v okně 22:00–06:00** — použít `(hour >= 22 || hour < 6)`, ne `&&` (vždy false).
+9. **Magnetické / vibrační rušení garážových motorů** — pokud bude problém, vložit po wake `delay(5 s)` a přeměřit, nebo filtrovat měření s |a| daleko od 1g.
+10. **MPU baseline „closed"** — zachycen při cold bootu, předpoklad vrata zavřená. Po vypnutí/zapnutí spínače musí být vrata zavřená, jinak posun reference.
+11. **GPIO9 je BOOT strapping pin C3**, na C3-LPKit obsazený NeoPixel DIN. WS2812 je high-Z dokud chip nezacne řídit → boot OK. Nikdy ale na GPIO9 nepřipojuj externí pull-down, jinak chip nenabootuje.
+12. **GPIO4 PERIPH_EN** — `gpio_hold_en` udržuje stav přes deep sleep. Bez něj by GPIO floatovala a perif rail by zůstal napájený.
 
 ---
 
@@ -380,19 +334,25 @@ Každý debug modul je samostatně flashovatelný firmware testující jednu vě
 
 | Modul | Příkaz |
 |---|---|
-| **Tilt debug** (MPU6050 monitoring) | `pio run -e tilt -t upload -t monitor` |
-| **Ntfy debug** (WiFi + Vbat status loop) | `pio run -e ntfy -t upload -t monitor` |
-| **Sleep debug** (ESP+MPU deep sleep) | `pio run -e sleep -t upload -t monitor` |
+| **c3led** (NeoPixel test) | `pio run -e c3led -t upload -t monitor` |
+| **c3wifi** (WiFi RSSI / anténa test) | `pio run -e c3wifi -t upload -t monitor` |
+| **c3mpu** (MPU6050/6500 bring-up) | `pio run -e c3mpu -t upload -t monitor` |
+| **c3power** (deep sleep + WiFi POST cyklus pro power měření) | `pio run -e c3power -t upload -t monitor` |
+| **c3sleep** (idle-only sleep bez WiFi, čisté ESP baseline) | `pio run -e c3sleep -t upload -t monitor` |
 | Jen build (bez upload) | `pio run -e <env>` |
 | Vyčistit build cache | `pio run -e <env> -t clean` |
 
 ### Co každý modul dělá
 
-**`tilt`** — po bootu zachytí baseline (50 vzorků, průměr), pak každou sekundu loguje tilt vůči baseline. Threshold 60° / 40° (hystereze). Per-axis values + delta + magnitude + úhel. Bez WiFi, bez sleep.
+**`c3led`** — cyklický NeoPixel barevný test. Ověření že WS2812 na GPIO9 funguje a PERIPH_EN switch na GPIO4 zapne perif rail.
 
-**`ntfy`** — WiFi connect, DNS override 1.1.1.1, NTP sync, boot notifikace, pak každou minutu status (čas + Vbat + RSSI + uptime). LED blink 1 Hz. Bez MPU, bez sleep.
+**`c3wifi`** — WiFi scan + connect + RSSI loop. Slouží pro ověření antény (built-in PCB vs externí přes u.FL/IPEX pigtail) a kvality signálu v cílové instalaci.
 
-**`sleep`** — ESP+MPU deep sleep cyklus. RTC timer wake po 30 s, boot counter v RTC slow memory, wake-cause detekce, Vbat reading. Konfigurovatelné `AWAKE_HOLD_MS` (delší active fáze pro multimetr odečet) a `MPU_PRESENT` (skip I²C při testu bez sensoru). EN/RST tlačítko vynuluje boot counter.
+**`c3mpu`** — MPU bring-up: I2C scan, WHO_AM_I detekce, accel + teplota loop. Akceptuje 0x68 (MPU-6050) i 0x70 (MPU-6500) s adekvátním teplotním vzorcem.
+
+**`c3power`** — full power cycle test. Deep sleep 30 s → wake → WiFi POST na ntfy → red/green LED → sleep. Dual log (USB-CDC + UART0) ať jde monitorovat i bez USB. Pro multimetr measurement workflow.
+
+**`c3sleep`** — varianta `c3power` bez WiFi. Měření čistého ESP+NeoPixel active proudu a deep sleep baseline.
 
 ### Přidání nového debug modulu
 
@@ -410,21 +370,10 @@ Sdílená konfigurace (board, port, build_flags) je v `[env]` sekci, neopisovat.
 
 ## TODO
 
-### Před git init / prvním commit
-- [x] Vytáhnout WiFi credentials a NTFY_TOPIC do `secrets.h` (gitignored)
-- [x] `.gitignore` (`.pio/`, `secrets.h`, OS junk)
-- [x] `README.md` s build/upload instrukcemi
-- [x] `USAGE.md` pro netechnické uživatele
-- [ ] Připnout PIO platform version v `platformio.ini` (`platform = espressif32@^6.5.0`)
-- [ ] Otestovat finální `src/main.cpp` end-to-end (cold boot → wake cyklus → alert → heartbeat)
-- [ ] Git init + first commit
-
 ### Před field deploymentem (battery-powered)
 - [ ] **Odpájet GY-521 zelenou power LED** — naměřeno 1,44 mA always-on
-- [ ] Ověřit jestli FireBeetle má další power LED (zatím nezpozorovaná, možná chybí na V1.0 revizi)
 - [ ] 3D tištěný / lepený držák MPU na vrata
 - [ ] Test 1 týden v reálných podmínkách, sledovat false positives z větru
 - [ ] Doladit threshold 60° / 40° pokud místní prostředí vyžaduje
-
-### Až dorazí ESP32-C3
-- [ ] Migrace dle sekce [Migrace na ESP32-C3](#migrace-na-esp32-c3) výše
+- [ ] Připnout PIO platform version v `platformio.ini` (`platform = espressif32@^6.5.0`)
+- [ ] AP config mode (přes double-tap RST) + NVS settings — viz Budoucí rozšíření

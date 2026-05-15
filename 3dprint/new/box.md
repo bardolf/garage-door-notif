@@ -16,8 +16,8 @@ Spodek (`base`):
 
 Víko (`lid`):
 - Flat plate with 4 counterbored holes for M3 socket-cap (imbus) screws.
-- **Lid half-cradle** (10 mm long at -X end of battery): mirrors base U-channel, fully encircles battery's wire end. Doubles as orientation key — won't fit if lid is rotated 180° because it would collide with the +X ring.
-- **1 ESP pressure pin** centered between the mounting holes (Y-axis), pressing the PCB down from above (protects from USB-C insertion force).
+- **Lid half-cradle** (10 mm long, centered along battery length): mirrors base U-channel in the middle of the cell, drží baterii dolů v U-kanálu. Konce baterie zůstávají volné pro vodiče.
+- ESP pressure pin: **odstraněn** — kolidoval by s rocker switch v -X stěně.
 
 Build:
 ```
@@ -34,7 +34,7 @@ These are not enforced by the .scad — if you change a parameter, verify these 
    — otherwise the +X ring sticks above the box top and lifts the lid. Currently `inner_z = batt_dia + 3.5` gives 0.5 mm clearance.
 2. **`inner_y` ≥ `mod_y1_esp + post_intrude + 0.5`**
    — keeps the +Y corner posts from colliding with the ESP module.
-3. **Zip-tie tunnel X positions** must be clear of `lid_cradle_len` (-X end) and the closed ring (+X end). Default 25/75 % gives 5 mm clearance both sides.
+3. **Zip-tie tunnel X positions** (25 / 75 % of battery length) must be clear of the centered `lid_cradle_len` (at 50 %) and the closed ring (+X end). 10 mm cradle at center leaves ~7.5 mm clearance to each tunnel.
 4. **Lid cradle Y span = base cradle Y span** (both use `cradle_w` via `batt_axis_y_g`). If you reposition the battery in Y, both follow automatically.
 5. **`screw_inset + screw_post_dia/2 ≤ wall + post_intrude_clearance`** — corner posts must remain attached to the walls. Currently `5 + 3.5 - 3 = 5.5 mm` intrusion into inner space; cradle_y0 (= 6) and other features are designed around this.
 6. **Battery in cradle: clearance with -Y corner posts requires `cradle_y0 ≥ post_intrude + 0.5`** — i.e. cradle has to start 6 mm from inner -Y wall to not collide with corner posts.
@@ -53,7 +53,6 @@ These are not enforced by the .scad — if you change a parameter, verify these 
 | Different battery retention | Lid cradle (`lid_cradle_len`) and/or zip-tie tunnels (`zip_x1_g`, `zip_x2_g`) — both currently active |
 | Reposition module screws (after measuring actual board) | `esp_hole_sp`, `esp_hole_inset`, `mpu_hole_sp`, `mpu_hole_inset` |
 | Reposition ESP under-support (single pillar) | `esp_support_dx_from_mount`, `esp_support_dia`, `esp_support_h` |
-| Reposition / resize ESP lid pin (single) | `esp_lid_pin_dx`, `esp_lid_pin_dia`, `esp_lid_pin_gap` |
 | Floor mounting holes elsewhere | `mount_x_offset`, `mount_y_offset` (from outer wall) |
 
 ## Things marked REMEASURE
@@ -73,7 +72,7 @@ ESP-related dimensions are MEASURED from a real board. The rest are educated gue
 6. Optionally: thread one or two zip-ties through the tunnels, over the battery, lock on -Y side.
 7. Screw ESP module to its two +X-edge standoffs (M2.5 self-tap, ~5–6 mm length).
 8. Screw MPU6050 to its two +Y-edge standoffs.
-9. Place lid (must be correctly oriented — lid cradle at the -X end). Tighten 4 M3 cap screws.
+9. Place lid (lid half-cradle sedí ve středu baterie). Tighten 4 M3 cap screws.
 
 ## Print notes
 
@@ -88,7 +87,6 @@ ESP-related dimensions are MEASURED from a real board. The rest are educated gue
 ## Known TODOs / future tweaks
 
 - Battery insertion is angled (+X end first, then drop -X end). Lid cradle is added separately, so insertion stays the same as without it.
-- Lid pressure pin is 11.5 mm tall × Ø 4.0 — single central pin, computed from `outer_z_base - floor_thk - esp_support_h - esp_lid_pin_gap`.
 - Zip-tie head: ensure 6+ mm of strip free between -Y wall and cradle for the head to sit; current = 6 mm (cradle_y0). If you make the cradle thicker (`cradle_side`), this shrinks.
 - ~~**Status LED window in lid**~~: hotovo — průchozí Ø 4 mm díra v lid plate, řízeno parametry `led_hole_dia`, `led_x_from_mount`, `led_y_from_pcb_inner_edge`. Pozice odměřena z reálné desky.
 

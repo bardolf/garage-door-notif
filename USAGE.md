@@ -21,21 +21,27 @@ Notifikace chodí přes službu **ntfy.sh** (free, žádný účet, jen appka v 
 
 Existují **4 druhy** zpráv, podle situace:
 
-### 🚀 „Hlidac garazovych vrat aktivni" — po zapnutí / nabití
+### 🚀 „Hlidac garazovych vrat aktivni" — po zapnutí
 
-Pošle se jednou, hned po tom co zařízení nastartuje (např. po výměně baterie nebo prvním zapnutí).
+Pošle se jednou, hned po tom co zařízení nastartuje (zapnutí spínače, výměna baterie, první instalace).
 
 **Co v ní stojí:**
 ```
-Cas: 17:23:45
-Baterka: 95 % (4,18 V)
-Signal: vyborny (-54 dBm)
-Sensor: baseline OK (|a|=0.998 g)
+Čas: 17:23:45
+Baterie: 95 % (4,18 V)
+Signál: ▮▮▮▮▮ (-54 dBm)
+
+Reference zavřených vrat zachycena.
+Orientace: leží naplocho (Z dominantní) (3° od horizontály).
+
+Pokud orientace neodpovídá realitě (vrata byla otevřená při instalaci),
+při zavřených vratech zařízení vypnout a zapnout — uloží se nová reference.
 ```
 
 **Co to znamená:**
-- Zařízení se nastartovalo, čas se synchronizoval, baterie nabita, WiFi v pohodě
-- „Sensor baseline OK" = senzor zachytil aktuální polohu vrat (předpokládá se zavřeno) jako referenční
+- Zařízení se nastartovalo, čas se synchronizoval, baterie nabitá, WiFi v pohodě
+- „Reference zachycena" = senzor si zapamatoval aktuální polohu vrat jako „zavřeno"
+- Pokud orientace v zprávě neodpovídá skutečné poloze zavřených vrat (např. píše „leží naplocho" ale vrata jsou vlastně otevřená), zařízení v zavřené poloze **vypnout a znovu zapnout** spínačem — uloží se nová reference
 - Pokud tahle zpráva nepřišla, něco selhalo — projděte sekci „Co dělat když..."
 
 ### 🚨 „GARAZ OTEVRENA!" — urgentní v noci
@@ -49,26 +55,33 @@ Jediná zpráva která má **urgent** prioritu (na iPhone i Androidu obejde tich
 
 **Co v ní stojí:**
 ```
-Cas: 22:30
-Naklon: 67° (limit 60°)
-Baterka: 85 %
+Čas: 22:30
+Náklon: 67° (limit 60°)
+Baterie: 85 %
+
+Zkontroluj vrata.
 ```
 
 **Co dělat:** zkontrolujte garáž. Buď fyzicky, nebo přes kameru / sousedy.
 
+> Pokud zařízení ztratilo synchronizaci času (např. WiFi výpadek delší dobu), místo času v notifikaci uvidíte `Čas: (čas neznámý)`. Alert přesto pošle — bezpečnostní funkce funguje i bez přesného času.
+
 ### ✅ „Garaz - denni kontrola" — denní heartbeat
 
-Posílá se **jednou denně ve 21:00** (hodina před začátkem nočního okna).
+Posílá se **jednou denně, od 21:00**. Pokud bylo zařízení ve 21:00 zaneprázdněné (poslední alert, WiFi sync), dorazí o pár minut později. Nikdy ne dříve.
 
-**Smysl:** ověření že zařízení žije a sensor funguje. **Pokud ji jeden den nedostanete, něco se pokazilo** — vybitá baterka, mrtvý ESP, vypnutá WiFi.
+**Smysl:** ověření že zařízení žije a senzor funguje. **Pokud ji jeden den nedostanete, něco se pokazilo** — vybitá baterie, mrtvý ESP, vypnutá WiFi.
 
 **Co v ní stojí:**
 ```
-Cas: 21:00
-Stav: ZAVRENO
-Naklon: 2°
-Baterka: 87 % (4,10 V)
-Signal: dobry (-67 dBm)
+Čas: 21:00
+Stav: ZAVŘENO
+Náklon: 2°
+Baterie: 87 % (4,10 V)
+Signál: ▮▮▮▮▯ (-67 dBm)
+Běží: 47d 3h 12m
+
+Pokud tato denní kontrola někdy nedorazí, něco se pokazilo — zkontroluj zařízení.
 ```
 
 ### ⚠️ „Hlidac vrat - CHYBA" — diagnostické chyby
@@ -76,33 +89,53 @@ Signal: dobry (-67 dBm)
 Pošle se když zařízení detekuje problém — typicky **senzor přestal odpovídat**. Priority `high` (důraznější než heartbeat, ale ne urgent).
 
 **Kdy přijde:**
-- MPU sensor neodpovídá na I²C komunikaci (kabel se uvolnil?)
-- MPU měření selhává opakovaně (sensor se rozbil?)
-- Baseline nebyl zachycen po startu
-- Tyto chyby trvají déle (každých ~5 min nová zpráva s počtem chyb), dokud se problém neopraví
+- Senzor nereaguje (uvolněný kabel? rozbitý modul?)
+- Reference nebyla zachycena po startu (vypnutí/zapnutí proběhlo špatně)
+- WiFi výpadek 3× po sobě (zařízení bylo offline) — pošle se na prvním reconnectu
+- Aby vás chyby nezahltily, posílají se nejvýš jednou za **30 minut**
 
 **Co v ní stojí:**
 ```
-Cas: 14:23
-Pocet chyb od posledniho hlaseni: 3
-Posledni: MPU sensor neodpovida (wake selhal)
-Baterka: 87 %
-Signal: dobry (-67 dBm)
+Čas: 14:23
+Počet chyb od posledního hlášení: 3
+Poslední: Senzor nereaguje (probuzení selhalo po 3 pokusech)
+Baterie: 87 %
+Signál: ▮▮▮▮▯ (-67 dBm)
+
+Chyby se opakují — pravděpodobně skutečný problém.
+Zkontroluj připojení senzoru (4 vodiče), případně vyměň modul.
 ```
 
-**Co dělat:** otevřete garáž, zkontrolujte:
-- Jsou všechny 4 dráty MPU senzoru zapojené (VCC, GND, SDA, SCL)?
+**Co dělat:** otevřete krabičku, zkontrolujte:
+- Jsou všechny 4 vodiče k senzoru zapojené (VCC, GND, SDA, SCL)?
 - Není kabel přerušený?
-- Stiskněte RST tlačítko na zařízení — pokud problém zmizí, byl to dočasný glitch
-- Pokud chyby pokračují, sensor je pravděpodobně mrtvý → výměna MPU6050 modulu
+- **Vypněte a zapněte** zařízení spínačem — pokud problém zmizí, byl to dočasný glitch
+- Pokud chyby pokračují, senzor je pravděpodobně mrtvý → výměna modulu
 
 **Důležité:** pokud chodí chyby, **alerty na otevřená vrata nemusí fungovat**. Zařízení nedokáže měřit náklon, takže by nevidělo ani skutečně otevřená vrata. **Berte chybové zprávy vážně.**
 
 ---
 
+## LED na zařízení
+
+V krabičce je viditelná RGB LED dioda (skrz průzor ve víku). Slouží jako sekundární indikátor stavu — víc se na ni ale spoléhat nemá smysl, primární kanál jsou notifikace v telefonu.
+
+| Barva | Význam |
+|-------|--------|
+| 🔵 **Modrá svítí** | Cold boot právě probíhá (po zapnutí spínače / výměně baterie). Trvá 5–10 s. |
+| 🟢 **Zelená 5 s svítí + 10 s bliká** | Cold boot proběhl úspěšně. Reference zachycena, WiFi OK, notifikace odeslána. Bliká během 10s okna pro nahrávání nového firmware (technické). |
+| 🔴 **Červená 5 s svítí + 10 s bliká** | Cold boot selhal — typicky chybí WiFi, nepodařilo se zachytit referenci nebo senzor nereaguje. Měla by dorazit i CHYBA notifikace (pokud WiFi zafungovala). |
+| 🟣 **Fialová svítí 5 s** | Právě byl odeslán alert „GARÁŽ OTEVŘENA". Vidíte jenom během běžné kontroly (každých 5 min), kdy byl alert úspěšně doručen. |
+| 🔴 **Červená svítí 5 s** během běžného provozu | Některá kontrola selhala (senzor nereaguje nebo se nepodařilo poslat zprávu). Chybová notifikace dorazí po reconnectu WiFi. |
+| **Zhasnutá** | Normální stav během deep sleep i během kontroly co neměla nic na hlášení. Většinu času uvidíte zhasnutou — to je správně. |
+
+**Proč to tak svítí krátce:** dlouhé svícení by žralo baterii. 5 s solid umožňuje zaregistrovat barvu zrakem během krátké návštěvy garáže, deep sleep pak LED úplně odpojí (0 µA).
+
+---
+
 ## Jak rozumět údajům ve zprávách
 
-### Baterka v procentech
+### Baterie v procentech
 
 | % | Voltáž | Stav | Co dělat |
 |---|---|---|---|
@@ -114,17 +147,19 @@ Signal: dobry (-67 dBm)
 | **<5** | <3,5 V | Kritická | **nabít HNED**, jinak hrozí výpadek |
 | **0** | ≤3,2 V | Vybitá | zařízení vypnuto, nezachycuje |
 
-Procenta jsou orientační (LiPo baterka má nelineární vybíjení), ale dávají dobrý odhad. **Důvěřujte heartbeatu — pokud chodí, zařízení žije.**
+Procenta jsou orientační (LiPo baterie má nelineární vybíjení), ale dávají dobrý odhad. **Důvěřujte heartbeatu — pokud chodí, zařízení žije.**
 
 ### Síla signálu (RSSI)
 
-| Slovo ve zprávě | dBm | Co to znamená |
+V zprávě vidíte signál jako 5-segmentový bar (`▮▮▮▮▮` plný / `▮▯▯▯▯` jeden) + dBm hodnotu:
+
+| Bar | dBm | Co to znamená |
 |---|---|---|
-| **vyborny** | > −60 | velmi blízko routeru, žádný problém |
-| **dobry** | −60 až −70 | normální, plně dostačuje |
-| **ok** | −70 až −80 | slabší, ale ještě funguje |
-| **slaby** | −80 až −90 | hraniční, občas může vypadnout |
-| **velmi slaby** | < −90 | nestabilní, alerty se nemusí dostat |
+| **▮▮▮▮▮** | > −60 | velmi blízko routeru, žádný problém |
+| **▮▮▮▮▯** | −60 až −70 | normální, plně dostačuje |
+| **▮▮▮▯▯** | −70 až −80 | slabší, ale ještě funguje |
+| **▮▮▯▯▯** | −80 až −90 | hraniční, občas může vypadnout |
+| **▮▯▯▯▯** | < −90 | nestabilní, alerty se nemusí dostat |
 
 Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. Ale obvykle není třeba řešit.
 
@@ -138,7 +173,9 @@ Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. 
 
 ### Čas ve zprávách
 
-Čas v notifikacích (`Cas: HH:MM`) **nemusí vždy přesně odpovídat skutečnému času** — může být odchýlený o pár minut. Zařízení nemá hodinový krystal pro přesné měření času; používá interní oscilátor a pravidelně si čas synchronizuje přes internet (každých ~10 minut). Pro účely hlídání nočního okna 22:00–06:00 je to dostatečně přesné, drobné odchýlky neovlivňují funkci.
+Čas v notifikacích (`Čas: HH:MM`) **nemusí vždy přesně odpovídat skutečnému času** — může být odchýlený o pár minut. Zařízení nemá hodinový krystal pro přesné měření času; používá interní oscilátor a pravidelně si čas synchronizuje přes internet (každých ~10 minut). Pro účely hlídání nočního okna 22:00–06:00 je to dostatečně přesné, drobné odchýlky neovlivňují funkci.
+
+Pokud zařízení ztratilo synchronizaci úplně (např. dlouhý WiFi výpadek, čerstvý cold boot bez internetu), v zprávě uvidíte `Čas: (čas neznámý)`. Alerty fungují i tak — jenom bez timestampu.
 
 ---
 
@@ -154,59 +191,63 @@ Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. 
 
 ### Zpráva „GARAZ OTEVRENA" se opakuje každých 5 min
 
-Vrata jsou pravděpodobně **skutečně otevřená a zaseklá** v té poloze. Buď je někdo zapomněl zavřít, nebo má motor vrat poruchu. Alerty budou chodit dokud vrata nezavřete (nebo dokud nezhasne baterka).
+Vrata jsou pravděpodobně **skutečně otevřená a zaseklá** v té poloze. Buď je někdo zapomněl zavřít, nebo má motor vrat poruchu. Alerty budou chodit dokud vrata nezavřete (nebo dokud nedojde baterie).
 
-### Heartbeat (denní zpráva ve 21:00) nepřišel
+### Heartbeat (denní zpráva od 21:00) nepřišel
 
 Možnosti, od nejpravděpodobnější:
 1. **Vybitá baterie** — ESP nemá energii na WiFi
-2. **WiFi výpadek** — router restartoval, ESP se zatím nepřipojilo
+2. **WiFi výpadek** — router restartoval, ESP se zatím nepřipojilo (po reconnectu by měla dorazit chybová notifikace „WiFi nedostupné Xx po sobě")
 3. **Spadlý ntfy.sh** (vzácné, ale stane se)
-4. **Hardware selhal** — ESP nebo MPU vypovědělo službu
+4. **Hardware selhal** — ESP nebo senzor vypovědělo službu
 
-**Co udělat:** počkejte do dalšího dne. Pokud druhý den znova nepřišel, otevřete garáž a zkontrolujte:
-- Svítí na zařízení nějaká LED? (zelenou na senzoru jsme odpájeli pro úsporu energie, takže nesvítí)
-- Je baterie nabitá? (zkuste nabít přes USB-C kabel)
-- Jsou všechny kabely zapojené?
+**Co udělat:** počkejte do dalšího dne. Pokud druhý den znova nepřišel, otevřete krabičku a zkontrolujte:
+- Svítí na zařízení LED? Pokud bliká **červeně**, je v chybovém stavu (viz LED sekce výše)
+- Je baterie nabitá? (zkuste nabít přes USB-C kabel — viz Nabíjení)
+- Jsou všechny vodiče k senzoru zapojené?
 
 ### Nepřišla úvodní zpráva po zapnutí
 
-Pravděpodobně se nepodařilo připojit k WiFi nebo nesynchronizovat čas. Zařízení po 5 minutách znovu zkusí. Pokud po 30 min nic, zkontrolujte:
-- WiFi router běží?
-- Heslo / SSID v `secrets.h` jsou správné? (technická úprava firmwaru)
+Pravděpodobně se nepodařilo připojit k WiFi nebo nesynchronizovat čas. Zařízení po 5 minutách znovu zkusí. Sledujte LED:
+- **Zelená blikající** ~10 s po zapnutí = vše OK, jen se nepovedlo poslat (síťový problém)
+- **Červená blikající** ~10 s po zapnutí = chyba (WiFi nedostupná, senzor nereaguje, čas nesynchronizován)
+
+Pokud po 30 min nic nedoraziilo:
+- WiFi router běží? Heslo / SSID správné?
+- Pokud LED neukazuje žádnou aktivitu = vybitá baterie nebo HW selhání
 
 ### Baterie pod 20 %
 
-Naplánujte nabití do týdne. Při kritickém stavu (<5 %) se zařízení samo vypne kolem 3,2 V — nehrozí poškození baterky.
+Naplánujte nabití do týdne. Při kritickém stavu (<5 %) se zařízení samo vypne kolem 3,2 V — nehrozí poškození baterie.
 
 ---
 
 ## Nabíjení
 
-Zařízení má **vestavěný USB-C konektor + nabíjecí čip TP4056**. Nabíjení:
+Zařízení má **vestavěný USB-C konektor + nabíjecí čip**. Nabíjení:
 
 1. Připojte USB-C kabel do zařízení
 2. Druhý konec do jakéhokoliv USB nabíječe (telefonní nabíječka, powerbanka, PC, …)
-3. Červená LED na zařízení svítí během nabíjení
-4. LED zhasne když je baterka plně nabitá (~2–3 hodiny pro 1000 mAh, ~6 h pro 18650)
+3. Indikační LED na desce nabíjení svítí během nabíjení (na samotném ESP modulu, mimo průzor)
+4. Zhasne když je baterie plně nabitá (~2–3 hodiny pro 1000 mAh, ~6 h pro 18650)
 5. Zařízení **může běžet i během nabíjení**, není třeba vypínat
 
-**Důležité:** zařízení se po výměně/odpojení baterky chová jako po prvním zapnutí — pošle „Hlidac garazovych vrat aktivni" notifikaci a znovu zachytí baseline (předpokládá vrata zavřená).
+**Důležité:** zařízení se po vypnutí/zapnutí spínačem (nebo výměně baterie) chová jako po prvním zapnutí — pošle „Hlidac garazovych vrat aktivni" notifikaci a znovu zachytí referenci polohy vrat.
 
-➜ **Nabíjejte tedy se zavřenými vraty**, jinak bude baseline špatně.
+➜ **Nabíjení samotné** s běžícím zařízením tohle nevyvolá (napájení nepřerušuje). Pokud ale potřebujete novou referenci (vrata se posunula, vyměnili jste senzor), **vypněte a zapněte spínač při zavřených vratech**.
 
 ---
 
 ## Časté otázky
 
 **Q: Co když dorazí FALSE positive (alert, ale vrata zavřená)?**
-A: Vyhodnoťte jednou. Pokud se opakuje, zařízení může mít posunutý baseline (např. vrata si „sednou" za pár měsíců). Stačí zařízení **resetovat tlačítkem RST**, znovu zachytí baseline z aktuální polohy.
+A: Vyhodnoťte jednou. Pokud se opakuje, zařízení může mít posunutou referenci (např. vrata si „sednou" za pár měsíců). Při zavřených vratech **vypněte a zapněte spínač** — zařízení zachytí novou referenci z aktuální polohy.
 
 **Q: Funguje to bez WiFi?**
 A: Ne. Zařízení potřebuje WiFi pro odeslání notifikace přes ntfy.sh. Bez WiFi neudělá nic užitečného (žádný lokální alert / siréna).
 
 **Q: Jak nastavit, která vrata má zařízení hlídat?**
-A: Senzor musí být **pevně přilepený k vratům** (ne na rámu, na pohyblivé části). Při zapnutí se zachytí aktuální poloha jako „zavřeno". Pak když se vrata pohnou >60°, alert.
+A: Senzor musí být **pevně přilepený k vratům** (ne na rámu, ne na pohyblivé části okolo). Při zapnutí spínače se zachytí aktuální poloha jako „zavřeno". Pak když se vrata pohnou >60°, alert.
 
 **Q: Funguje to na sekční / rolovací / křídlová vrata?**
 A: Ano, na všechna, která se naklánějí o víc než 60° při otevření. Sekční (skládací do stropu) typicky 90°, křídlová 90°, rolovací (svisle navíjená) jen ~5–10° — **na rolovací nefunguje**, je třeba jiný senzor.
@@ -222,15 +263,19 @@ A: Buď vypněte ntfy.sh appku v telefonu před tím, nebo akceptujte alert (př
 ## Technický overview pro zvědavé
 
 Zařízení obsahuje:
-- **ESP32** mikrokontroler — mozek, WiFi
-- **MPU6050** akcelerometr — měří náklon
-- **LiPo baterii** s integrovaným nabíjecím čipem
+- **ESP32-C3** mikrokontroler (LaskaKit C3-LPKit v4) — mozek, WiFi, USB-C
+- **MPU6050 / MPU6500** akcelerometr (GY-521 modul) — měří náklon
+- **WS2812 NeoPixel** RGB LED — indikace stavu
+- **LiPo baterii** s integrovaným nabíjecím čipem na desce
+- **Spínač** v sérii s baterií (pro vynucenou novou referenci)
 
 Cyklus:
-1. ESP32 spí 99,9 % času (deep sleep, ~20 µA)
-2. Každých 5 minut se na ~150 ms probudí
-3. Probudí senzor přes I²C, změří náklon
-4. Pokud je důvod (alert, denní heartbeat, sync času), zapne WiFi a pošle zprávu
+1. ESP32 spí 99,9 % času (deep sleep, naměřeno **19 µA**)
+2. Každých 5 minut se na ~5 s probudí
+3. Probudí senzor přes I²C, změří náklon (3 retry pokusy proti glitchům)
+4. Pokud je důvod (alert, denní heartbeat, sync času, error report), zapne WiFi a pošle zprávu
 5. Zpět do spánku
+
+**Životnost na baterii** (18650 3200 mAh, klidový provoz bez alertů): teoreticky ~1,5–2 roky. Reálně limitované samovybíjením baterie a chladem v zimní garáži → **plánovat nabíjení 1× ročně**.
 
 Detaily v `README.md`.
