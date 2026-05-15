@@ -7,6 +7,8 @@
 
 ## Co to je a co to dělá
 
+<img src="imgs/img5.jpg" alt="Hotová krabička s kolébkovým spínačem a externí anténou" width="450">
+
 V garáži je malé zařízení (ESP32 + senzor náklonu) připevněné k vratům. Běží na baterii, která vydrží **dlouho** (řádově měsíce až roky podle typu baterie).
 
 **Jeho jedinou prací je hlídat: jsou vrata otevřená v noci?**
@@ -200,10 +202,13 @@ Chyby se opakují — pravděpodobně skutečný problém.
 Zkontroluj připojení senzoru (4 vodiče), případně vyměň modul.
 ```
 
-**Co dělat:** otevřete krabičku, zkontrolujte:
-- Jsou všechny 4 vodiče k senzoru zapojené (VCC, GND, SDA, SCL)?
+**Co dělat:** otevřete krabičku (vyšroubujte 4 šroubky ve víku), zkontrolujte:
+
+<img src="imgs/img3.jpg" alt="Vnitřek krabičky — referenční obrázek co kde má být" width="350">
+
+- Jsou všechny 4 vodiče k senzoru (GY-521, vpravo nahoře na obrázku) zapojené (VCC, GND, SDA, SCL)? Pájené spoje by se neměly uvolnit.
 - Není kabel přerušený?
-- **Vypněte a zapněte** zařízení spínačem — pokud problém zmizí, byl to dočasný glitch
+- **Vypněte a zapněte** zařízení spínačem (vlevo na obrázku) — pokud problém zmizí, byl to dočasný glitch
 - Pokud chyby pokračují, senzor je pravděpodobně mrtvý → výměna modulu
 
 **Důležité:** pokud chodí chyby, **alerty na otevřená vrata nemusí fungovat**. Zařízení nedokáže měřit náklon, takže by nevidělo ani skutečně otevřená vrata. **Berte chybové zprávy vážně.**
@@ -212,7 +217,9 @@ Zkontroluj připojení senzoru (4 vodiče), případně vyměň modul.
 
 ## LED na zařízení
 
-V krabičce je viditelná RGB LED dioda (skrz průzor ve víku). Slouží jako sekundární indikátor stavu — víc se na ni ale spoléhat nemá smysl, primární kanál jsou notifikace v telefonu.
+<img src="imgs/img4.jpg" alt="Víko krabičky s průzorem pro LED diodu uprostřed" width="350">
+
+V krabičce je viditelná RGB LED dioda (skrz **průzor ve víku** — viditelná na fotce výše, malá kulatá dírka uprostřed). Slouží jako sekundární indikátor stavu — víc se na ni ale spoléhat nemá smysl, primární kanál jsou notifikace v telefonu.
 
 | Barva | Význam |
 |-------|--------|

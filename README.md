@@ -68,11 +68,21 @@ WAKE CYCLE (každých 5 min)
 
 ## Hardware
 
+<img src="imgs/img1.jpg" alt="Hotová krabička s externí anténou vedle pravítka pro měřítko" width="600">
+
+*Hotové zařízení (varianta s externí anténou) — 3D tištěná krabička 7×8×3 cm, vlevo viditelná externí anténa 2,4 GHz na pigtailu.*
+
+> **Pozor — LaskaKit ESP32-C3-LPKit v4 existuje ve dvou variantách:**
+> 1. **S integrovanou PCB anténou** — plug-and-play, stačí samotná deska. Vhodné pokud AP je v rozumné vzdálenosti (~10 m, přes 1 zeď).
+> 2. **S u.FL/IPEX konektorem pro externí anténu** — bez antény nepřijímá WiFi! Nutné dokoupit **pigtail U.FL ↔ SMA** + **externí anténu 2,4 GHz** (řádky níže v BOM). Větší dosah, vhodné kdy AP přes víc zdí nebo dál.
+>
+> Při objednávce ověřit kterou variantu máš — popis na LaskaKit produktové stránce nemusí být jednoznačný, podle revize. Pokud nevíš, podívej se na fotku desky: PCB anténa = klikatý měděný motiv u rohu modulu; externí varianta má malý stříbrný konektor.
+
 ### BOM
 
 | Položka | Cena | Pozn. |
 |---|---:|---|
-| **[LaskaKit ESP32-C3-LPKit v4](https://www.laskakit.cz/laskkit-esp-12-board/)** (board ID `esp32-c3-devkitm-1`) | 298 Kč | ESP32-C3 (RISC-V), nativní USB-CDC bez externího USB-Serial čipu, on-board WS2812 NeoPixel RGB LED (GPIO9), JST-PH 2.0 + integrovaný LiPo charger, low-quiescent LDO se softwarovým `PERIPH_EN` switchem (GPIO4) pro perif. rail. Sleep proud naměřeno **19 µA** — viz [Spotřeba](#spotřeba). **Pozor: existují 2 varianty desky** — jedna s integrovanou PCB anténou (plug-and-play), druhá s u.FL/IPEX konektorem pro externí anténu + pigtail (řádky níže). |
+| **[LaskaKit ESP32-C3-LPKit v4](https://www.laskakit.cz/laskkit-esp-12-board/)** (board ID `esp32-c3-devkitm-1`) | 298 Kč | ESP32-C3 (RISC-V), nativní USB-CDC bez externího USB-Serial čipu, on-board WS2812 NeoPixel RGB LED (GPIO9), JST-PH 2.0 + integrovaný LiPo charger, low-quiescent LDO se softwarovým `PERIPH_EN` switchem (GPIO4) pro perif. rail. Sleep proud naměřeno **19 µA** — viz [Spotřeba](#spotřeba). Antenna varianta — viz poznámka nad tabulkou. |
 | **[Pigtail U.FL ↔ SMA female, 15 cm](https://www.laskakit.cz/pigtail-u-fl-sma-female--kabel-1-13mm--15cm/)** *(jen u externí antény)* | 38 Kč | Propojení on-board U.FL/IPEX konektoru s externí anténou přes SMA spoj. Nutné jen u varianty desky bez integrované PCB antény. |
 | **[Anténa 2,4 GHz 10 cm SMA](https://www.laskakit.cz/antena-10cm-2-4g/)** *(jen u externí antény)* | 88 Kč | NiceRF SW2400-ZD115. Šroubuje se na pigtail. Lepší dosah než on-board PCB anténa — vhodné pokud je AP daleko nebo přes zdi. |
 | **[GY-521 MPU6050 / MPU6500](https://www.laskakit.cz/arduino-gyroskop-a-akcelerometr-gy-521--mpu6050/)** (akcelerometr) | 98 Kč | 6-axis IMU, I²C adresa `0x68`, on-board 3,3 V LDO + 4,7 kΩ pull-upy na SDA/SCL. Silkscreen říká „MPU6050", v praxi často osazeno **MPU-6500** (WHO_AM_I=0x70) — firmware detekuje a akceptuje obě varianty. Zelená status LED na modulu odpájet (1,44 mA always-on). |
@@ -116,6 +126,17 @@ GY-521 modul napájíme **z PERIPH_EN railu** (přes GPIO4 power switch) — v d
 Pull-up rezistory pro I²C jsou integrované na GY-521 modulu (4.7 kΩ na SDA i SCL), externí netřeba.
 
 **MPU chip:** silkscreen modulů obvykle říká `MPU6050`, ale GY-521 se prodávají s oběma — MPU-6050 (WHO_AM_I=0x68) i MPU-6500 (0x70). Firmware akceptuje 0x68/0x70/0x71/0x73 (MPU-6050/6500/9250/9255), register layout je v naší podmnožině (accel + temp) kompatibilní.
+
+### Sestavení v krabičce
+
+<img src="imgs/img2.jpg" alt="Vnitřek krabičky — ESP modul, MPU senzor, 18650 baterie, spínač, U.FL pigtail" width="500">
+
+Layout uvnitř (z fotky):
+- **Vlevo nahoře:** kolébkový spínač v -X stěně, pájené přímo na baterii (rozpojuje +pól)
+- **Vlevo nahoře vedle:** ESP32-C3-LPKit přišroubovaný k +X stěně, USB-C přístupný zvenku
+- **Vpravo nahoře:** GY-521 MPU modul přišroubovaný na +Y stěnu, 4 pájené drátky do ESP
+- **Vpravo střed:** U.FL pigtail s SMA bulkhead konektorem do +X stěny, externí anténa zvenku
+- **Dole:** 18650 baterie v U-kanálu, fixovaná dvěma zip-ties přes víko
 
 ---
 
