@@ -22,7 +22,13 @@
 
 #include <Arduino.h>
 #include "esp_sleep.h"
+#include "esp_system.h"
+#include "soc/rtc.h"
+extern "C" uint64_t rtc_time_slowclk_to_us(uint64_t rtc_cycles, uint32_t period);
+extern "C" uint64_t rtc_time_get();
+extern "C" uint32_t rtc_clk_slow_freq_get_hz();
 
+#include "ap_config.h"
 #include "config.h"
 #include "led.h"
 #include "net.h"
@@ -30,6 +36,7 @@
 #include "power.h"
 #include "sensor.h"
 #include "state.h"
+#include "storage.h"
 #include "time_utils.h"
 
 namespace {
@@ -51,12 +58,12 @@ bool mpu_bringup() {
 void enter_deep_sleep() {
   Serial.printf("[sleep] %sgoing to sleep for %lu s\n",
                 DEEP_SLEEP_ENABLED ? "" : "[DEBUG simulated] ",
-                static_cast<unsigned long>(WAKE_INTERVAL_S));
+                static_cast<unsigned long>(cfg.wake_interval_s));
   Serial.flush();
 
   if (DEEP_SLEEP_ENABLED) {
     periph_power_off_for_sleep();
-    esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(WAKE_INTERVAL_S) * 1000000ULL);
+    esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(cfg.wake_interval_s) * 1000000ULL);
     esp_deep_sleep_start();
     // unreachable — wake = reset
   }
@@ -67,7 +74,12 @@ void enter_deep_sleep() {
 
 void do_cold_boot() {
   Serial.println(F("=== COLD BOOT ==="));
-  state = AppState{};                 // zero-init vsech fieldu
+  // Preserve double-RST tracking (nastaveno v setup() pred volanim).
+  uint64_t save_rtc_us = state.last_cold_boot_rtc_us;
+  uint8_t  save_rapid  = state.rapid_reset_count;
+  state = AppState{};                 // zero-init vsech ostatnich fieldu
+  state.last_cold_boot_rtc_us  = save_rtc_us;
+  state.rapid_reset_count      = save_rapid;
   state.magic                  = STATE_MAGIC;
   state.boot_count             = 1;
 
@@ -124,13 +136,8 @@ void do_cold_boot() {
     delay(LED_BLINK_HALF_PERIOD_MS);
     led_off();
     delay(LED_BLINK_HALF_PERIOD_MS);
-    if (s % 5 == 4) {
-      Serial.printf("[boot] %lu s do pokracovani\n",
-                    static_cast<unsigned long>(COLD_BOOT_UPLOAD_WINDOW_S - s - 1));
-    }
   }
   led_off();
-  Serial.println(F("[boot] upload window konec, pokracuje deep sleep"));
 }
 
 // Pokus o MPU mereni s retry. Vraci true pri uspechu; zaradi chybu do queue
@@ -194,7 +201,7 @@ WakeActions compute_wake_actions(bool measure_ok, bool door_open) {
 
   // Heartbeat: jen kdyz mame cas. >= HEARTBEAT_HOUR misto == zachyti zmeskane
   // wakes. Year-safe dedup pres unix elapsed >= 23h.
-  if (act.time_synced && current_hour() >= HEARTBEAT_HOUR &&
+  if (act.time_synced && current_hour() >= cfg.heartbeat_hour &&
       elapsed_at_least(static_cast<uint64_t>(now), state.last_heartbeat_unix, HEARTBEAT_MIN_GAP_S)) {
     act.heartbeat = true;
   }
@@ -252,7 +259,7 @@ void do_wake_cycle() {
     format_time(timestr, sizeof(timestr), "%H:%M:%S");
     Serial.printf("[time] %s, hour=%d, night_window(%d-%d)=%s\n",
                   timestr, current_hour(),
-                  NIGHT_START_HOUR, NIGHT_END_HOUR,
+                  cfg.night_start_hour, cfg.night_end_hour,
                   is_night_window() ? "YES" : "NO");
   } else {
     Serial.println(F("[time] not synced — alert je fail-open"));
@@ -354,22 +361,111 @@ void check_unexpected_reset() {
 
 }  // namespace
 
+// Double-RST detection. Counter zije v RTC mem (prezije RST) a inkrementuje
+// se pri kazdem ne-timer setupu (= RST nebo true cold boot). Pri deep sleep
+// wake se nuluje (stabilni provoz). Pokud counter dosahne DOUBLE_RST_THRESHOLD
+// v okne DOUBLE_RST_WINDOW_US, je to user-trigger pro AP mode.
+//
+// Pri prvnim ever bootu (magic invalid) ma RTC mem nahodny obsah → musime
+// fields explicitne inicializovat pred ctenim.
+bool detect_double_rst(esp_sleep_wakeup_cause_t cause, bool true_cold_boot) {
+  if (true_cold_boot) {
+    state.last_cold_boot_rtc_us = 0;
+    state.rapid_reset_count = 0;
+  }
+  if (cause == ESP_SLEEP_WAKEUP_TIMER) {
+    state.rapid_reset_count = 0;
+    return false;
+  }
+  // RTC slow clock prezije RST (pouze power-off ho resetuje). Pro mereni gap
+  // mezi RST-y vyrobime us z slow clock cycles × period.
+  uint64_t now_us = rtc_time_slowclk_to_us(rtc_time_get(), rtc_clk_slow_freq_get_hz());
+  uint64_t since  = now_us - state.last_cold_boot_rtc_us;
+  if (state.last_cold_boot_rtc_us > 0 && since < DOUBLE_RST_WINDOW_US) {
+    state.rapid_reset_count++;
+  } else {
+    state.rapid_reset_count = 1;
+  }
+  state.last_cold_boot_rtc_us = now_us;
+  Serial.printf("[boot] rapid_reset_count=%u (since=%llu ms)\n",
+                state.rapid_reset_count, (unsigned long long)(since / 1000));
+  if (state.rapid_reset_count >= DOUBLE_RST_THRESHOLD) {
+    state.rapid_reset_count = 0;   // neopakovat AP pri dalsim cold bootu
+    return true;
+  }
+  return false;
+}
+
+// External AP trigger: pri propojeni AP_TRIGGER_PIN_IN ↔ AP_TRIGGER_PIN_GND
+// pri startu vraci true. Po check uvolni oba piny (INPUT high-Z).
+bool detect_external_ap_trigger() {
+  pinMode(AP_TRIGGER_PIN_GND, OUTPUT);
+  digitalWrite(AP_TRIGGER_PIN_GND, LOW);
+  pinMode(AP_TRIGGER_PIN_IN, INPUT_PULLUP);
+  delay(5);   // settle pullup vs. driven LOW
+  bool triggered = (digitalRead(AP_TRIGGER_PIN_IN) == LOW);
+  pinMode(AP_TRIGGER_PIN_GND, INPUT);    // release
+  pinMode(AP_TRIGGER_PIN_IN, INPUT);     // release (pullup off)
+  return triggered;
+}
+
 void setup() {
   periph_power_on();
   led_initialize();
   adc_initialize();
 
+  // External AP trigger check — pred Serial init, rychly. Kontrolujeme jen pri
+  // cold bootu / RST, ne pri deep sleep wake — kdyby uzivatel zapomnel propojku
+  // odstranit, kazdy wake by skocil do AP a baterii by to vycerpalo.
+  esp_sleep_wakeup_cause_t cause_early = esp_sleep_get_wakeup_cause();
+  bool ext_ap_trigger = false;
+  if (cause_early != ESP_SLEEP_WAKEUP_TIMER) {
+    ext_ap_trigger = detect_external_ap_trigger();
+  }
+
   Serial.begin(115200);
   delay(SERIAL_INIT_DELAY_MS);
   Serial.println();
+
+  if (ext_ap_trigger) {
+    Serial.println(F("[boot] >>> external AP trigger (GPIO20↔GPIO21 short) <<<"));
+  }
 
   // TZ env var se nepřežije deep sleep — nastavit pri kazdem wake.
   setenv("TZ", TZ_CZ, 1);
   tzset();
 
   esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-  bool magic_valid    = (state.magic == STATE_MAGIC);
-  bool true_cold_boot = !magic_valid;
+  bool true_cold_boot = (state.magic != STATE_MAGIC);
+
+  bool double_rst = detect_double_rst(cause, true_cold_boot);
+
+  Serial.printf("[boot] cause=%d cold_boot=%d magic=0x%08X\n",
+                static_cast<int>(cause), static_cast<int>(true_cold_boot),
+                static_cast<unsigned>(state.magic));
+
+  // Nacti NVS config (defaults z config.h / secrets.h pro nenalezene klice).
+  cfg_load();
+
+  bool force_ap = double_rst || ext_ap_trigger;
+  if (force_ap) {
+    if (double_rst)     Serial.println(F("[boot] DOUBLE-RST trigger"));
+    if (ext_ap_trigger) Serial.println(F("[boot] external GPIO trigger"));
+    Serial.println(F("[boot] mazu NVS config a startuji AP mode"));
+    cfg_clear();
+    cfg_load();   // znovu nacti = vse defaults
+  }
+
+  if (!cfg.configured) {
+    Serial.println(F("[boot] NVS prazdne (nebo smazano) → vstupuji do AP modu"));
+    run_ap_mode();
+    // run_ap_mode bud restartne (po save) nebo deep-sleep (po timeoutu) —
+    // sem se nedostaneme. Return je formalita pro toolchain.
+    return;
+  }
+
+  Serial.printf("[boot] NVS configured (ssid='%s', topic='%s') → normalni boot\n",
+                cfg.wifi_ssid, cfg.ntfy_topic);
 
   if (true_cold_boot) {
     do_cold_boot();
@@ -392,7 +488,7 @@ void loop() {
   // hned vrati). State preziva vse v RAM, RTC mem netreba.
   if (DEEP_SLEEP_ENABLED) return;
 
-  delay(static_cast<uint32_t>(WAKE_INTERVAL_S) * 1000UL);
+  delay(static_cast<uint32_t>(cfg.wake_interval_s) * 1000UL);
   Serial.println(F("[boot] [DEBUG simulated] woke up"));
   do_wake_cycle();
   enter_deep_sleep();

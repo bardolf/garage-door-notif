@@ -1,6 +1,7 @@
 #include "time_utils.h"
 
 #include "config.h"
+#include "storage.h"
 
 bool time_is_synced() {
   time_t now;
@@ -35,5 +36,5 @@ int current_yday() {
 
 bool is_night_window() {
   int h = current_hour();
-  return (h >= NIGHT_START_HOUR || h < NIGHT_END_HOUR);
+  return (h >= cfg.night_start_hour || h < cfg.night_end_hour);
 }

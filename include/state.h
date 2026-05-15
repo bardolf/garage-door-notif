@@ -10,8 +10,15 @@
 #include <Arduino.h>
 #include "vec3.h"
 
-constexpr uint32_t STATE_MAGIC = 0xC0FFEE45;     // bumped: added heartbeat_unix, wifi_fail_count, error_msg_len constant
+constexpr uint32_t STATE_MAGIC = 0xC0FFEE46;     // bumped: added rapid_reset fields
 constexpr size_t   PENDING_ERROR_MSG_LEN = 96;
+
+// Double-RST detection prahy. RTC slow clock tika i pres EN/RST (jen power-off ho
+// resetuje), takze `esp_rtc_get_time_us` mereny rozdil mezi cold boots = pravdivy
+// realtime gap. 2 s je rychly double-tap, bezne uzivatelske RST mimo workflow je
+// pomalejsi nez to.
+constexpr uint64_t DOUBLE_RST_WINDOW_US = 2000000ULL;
+constexpr uint8_t  DOUBLE_RST_THRESHOLD = 2;       // 2 rychle cold boots → AP
 
 struct AppState {
   uint32_t magic;
@@ -29,6 +36,9 @@ struct AppState {
   char     pending_error_msg[PENDING_ERROR_MSG_LEN];
   uint8_t  mpu_who_id;                // 0x68=MPU-6050, 0x70=MPU-6500
   uint32_t wifi_consecutive_fails;    // pocet po sobe failnutych WiFi connectu
+  // Double-RST tracking — pro AP trigger pres dvojklik RST tlacitka.
+  uint64_t last_cold_boot_rtc_us;     // esp_rtc_get_time_us pri minulem cold bootu
+  uint8_t  rapid_reset_count;         // pocet cold bootu v rade do DOUBLE_RST_WINDOW_US
 };
 
 extern RTC_DATA_ATTR AppState state;

@@ -11,9 +11,103 @@ V garáži je malé zařízení (ESP32 + senzor náklonu) připevněné k vratů
 
 **Jeho jedinou prací je hlídat: jsou vrata otevřená v noci?**
 
-Pokud ano (mezi **22:00 a 06:00**), pošle vám okamžitou notifikaci na mobil. Mimo tuto dobu vás zařízení neotravuje — předpokládá se, že přes den s vraty pracujete normálně.
+Pokud ano (mezi **22:00 a 06:00**, nebo dle nastavení), pošle vám okamžitou notifikaci na mobil. Mimo tuto dobu vás zařízení neotravuje — předpokládá se, že přes den s vraty pracujete normálně.
 
 Notifikace chodí přes službu **ntfy.sh** (free, žádný účet, jen appka v telefonu).
+
+---
+
+## První nastavení (instalace)
+
+Zařízení po prvním zapnutí spustí konfigurační WiFi „hotspot" — připojíte se k němu telefonem, vyplníte formulář, zařízení se restartuje a začne fungovat. Postup:
+
+### 1. Nainstalujte si aplikaci ntfy.sh
+
+Najdete pod názvem **ntfy** (autor Philipp Heckel) v:
+- 📱 **Google Play** (Android): https://play.google.com/store/apps/details?id=io.heckel.ntfy
+- 🍎 **App Store** (iOS): https://apps.apple.com/app/ntfy/id1625396347
+
+Aplikace je zdarma, **bez registrace**, bez reklam. Stačí ji nainstalovat, pak ji použijete v kroku 6.
+
+### 2. Zapněte zařízení
+
+Pokud má spínač, zapněte ho. Pokud má baterii s konektorem, připojte.
+
+Po zapnutí by se měla **LED dioda (skrze průzor ve víku) začít rozblikávat modře** — trojitý blik každé 3 s. To je **konfigurační režim** — zařízení čeká na konfiguraci (10 minut, pak usne a zkusí znovu při dalším probuzení).
+
+> Pokud LED svítí modře pevně 5–10 s a pak zhasne / přeblikne na zelenou nebo červenou, zařízení **už je nakonfigurované** z dřívějška. Pokud chcete přenastavit, viz sekce „Resetování konfigurace" níže.
+
+### 3. Připojte telefon na WiFi zařízení
+
+V telefonu otevřete WiFi nastavení. V seznamu sítí najděte **„garaz-XXXXXX"** (kde XXXXXX je 6 hex znaků unikátní pro vaše zařízení — např. `garaz-235CE8`).
+
+Síť je **otevřená, bez hesla**. Klepněte na ni a připojte se. Telefon může vypsat varování „Tato síť nemá přístup k internetu" — to je v pořádku, my chceme jen otevřít konfigurační stránku.
+
+### 4. Otevřete konfigurační stránku
+
+V prohlížeči zadejte adresu:
+
+```
+http://192.168.4.1
+```
+
+Měl by se zobrazit formulář **„Hlídač vrat — konfigurace"**.
+
+### 5. Vyplňte formulář
+
+| Pole | Co tam napsat |
+|------|---------------|
+| **WiFi síť (SSID)** | Vyberte ze seznamu vaši domácí WiFi. (Pokud chybí, znovu načtěte stránku — zařízení nascanovalo sítě.) |
+| **Heslo WiFi** | Heslo k vaší domácí WiFi. |
+| **ntfy.sh topic** | Předvyplněný náhodný kód, např. `garaz-48F6EE-235CE8`. ⚠️ **Tento kód si zapamatujte / opište** — budete ho potřebovat v kroku 6. Můžete ho nechat předvyplněný, nebo nahradit vlastním (10+ znaků, ne slovník — topic je veřejný, kdokoli kdo ho zná, vidí vaše notifikace). |
+| **Název zařízení** | Libovolné, např. „garaz" nebo „domeček". Pro vaši orientaci, kdybyste měli víc zařízení. |
+| **Začátek nočního okna** | Hodina kdy začnou alerty. Default `22`. |
+| **Konec nočního okna** | Hodina kdy alerty skončí. Default `6`. |
+| **Hodina denní kontroly** | Kdy přijde heartbeat „žiju" (jednou denně). Default `21`. |
+| **Interval kontroly** | Jak často zařízení měří náklon. Default `300` (5 min). |
+
+Klepněte **„Uložit a otestovat WiFi"**.
+
+Zařízení teď zkusí připojit se k vaší WiFi (~15 s). Pokud heslo nesedí, dostanete chybu a můžete zkusit znovu. Pokud OK, zobrazí se „✅ Uloženo" a zařízení se samo restartuje.
+
+### 6. Subscribe v aplikaci ntfy.sh
+
+Po restartu telefonu (cca 10 s) se telefon sám odpojí od „garaz-XXXXXX" (síť přestane existovat). Připojte ho zpět na vaši **domácí WiFi**.
+
+V aplikaci **ntfy**:
+1. Klepněte na **+** vpravo dole (přidat subscription)
+2. Do pole **„Topic name"** vložte topic z kroku 5 (např. `garaz-48F6EE-235CE8`)
+3. **„Server"** nechte na `ntfy.sh` (default)
+4. Klepněte **„Subscribe"**
+
+### 7. Ověření že to funguje
+
+Po restartu (kroku 5) by mělo zařízení během cca 10 sekund:
+- 🟢 **Zelená LED svítí 5 s** (pokud vše OK) → poslalo se „Hlidac garazovych vrat aktivni"
+- 🔴 **Červená LED svítí 5 s** (pokud něco selhalo) → zkontrolujte hesla/topic, opakujte krok 5
+
+Současně by vám měla **dorazit notifikace „Hlidac garazovych vrat aktivni"** v ntfy.sh aplikaci. Otevřete ji a uvidíte stav baterie, signál a aktuální orientaci.
+
+**Pokud notifikace nedorazila** ani po 30 s a LED svítí zeleně:
+- Zkontrolujte, že je topic v aplikaci ntfy přesně stejný jako ten ve formuláři (case-sensitive!)
+- Zkontrolujte že telefon je na WiFi (pokud na mobilních datech, taky funguje)
+
+### 8. Test detekce náklonu (volitelné, doporučené)
+
+Než zařízení namontujete na vrata, otestujte si že detekce funguje. Buď:
+- **Reálný test (počká do noci):** namontujte, otevřete vrata po 22:00 (nebo dle nastavení) — měl by přijít alert.
+- **Rychlý test (hned):** přes konfiguraci nastavte „Začátek nočního okna" na aktuální hodinu, pak nakloňte zařízení o 90° (na bok). Při příští kontrole (do ~5 min, podle intervalu) dorazí alert „GARAZ OTEVRENA!". Vraťte zařízení do původní polohy a okno alertu vraťte na 22.
+
+### Resetování konfigurace
+
+Pokud chcete změnit nastavení (jiná WiFi, jiný topic) nebo zařízení znovu nakonfigurovat:
+
+1. **Vypněte zařízení** spínačem.
+2. **Propojte piny GPIO20 a GPIO21** na headeru (dva sousední piny, dají se zkratovat 2-pin jumperem nebo kouskem drátu).
+3. **Zapněte zařízení.**
+4. LED začne **modře blikat trojitě** = AP režim aktivní. Pokračujte krokem 3 výše.
+
+Po nakonfigurování spínač vypněte, jumper odeberte (jinak se AP režim spustí znovu při dalším zapnutí), spínač zapněte → normální provoz.
 
 ---
 
@@ -34,7 +128,7 @@ Signál: ▮▮▮▮▮ (-54 dBm)
 Reference zavřených vrat zachycena.
 Orientace: leží naplocho (Z dominantní) (3° od horizontály).
 
-Pokud orientace neodpovídá realitě (vrata byla otevřená při instalaci),
+Pokud orientace neodpovídá realitě (vrata mají být zavřená při instalaci),
 při zavřených vratech zařízení vypnout a zapnout — uloží se nová reference.
 ```
 
@@ -49,7 +143,7 @@ při zavřených vratech zařízení vypnout a zapnout — uloží se nová refe
 Jediná zpráva která má **urgent** prioritu (na iPhone i Androidu obejde tichý režim, rozsvítí displej).
 
 **Kdy přijde:**
-- Mezi 22:00 a 06:00
+- Mezi 22:00 a 06:00 (nebo dle nastavení)
 - Vrata jsou otevřená (náklon > 60° od původní polohy)
 - **Při každé kontrole** (cca každých 5 min, dokud vrata nezavřete) — chceme abyste byli upozorněni opakovaně, ne jednou a dost
 
@@ -123,6 +217,7 @@ V krabičce je viditelná RGB LED dioda (skrz průzor ve víku). Slouží jako s
 | Barva | Význam |
 |-------|--------|
 | 🔵 **Modrá svítí** | Cold boot právě probíhá (po zapnutí spínače / výměně baterie). Trvá 5–10 s. |
+| 🔵 **Modrá — trojitý blik každé 3 s** | **Konfigurační režim (AP)**. Zařízení vystavilo WiFi „garaz-XXXXXX" a čeká, až se na něj připojíte telefonem a vyplníte formulář. Nastane při prvním zapnutí (prázdná konfigurace) nebo když propojíte piny GPIO20+GPIO21. Trvá až 10 min, pak usne a zkusí znovu při dalším probuzení. Viz [První nastavení](#první-nastavení-instalace) výše. |
 | 🟢 **Zelená 5 s svítí + 10 s bliká** | Cold boot proběhl úspěšně. Reference zachycena, WiFi OK, notifikace odeslána. Bliká během 10s okna pro nahrávání nového firmware (technické). |
 | 🔴 **Červená 5 s svítí + 10 s bliká** | Cold boot selhal — typicky chybí WiFi, nepodařilo se zachytit referenci nebo senzor nereaguje. Měla by dorazit i CHYBA notifikace (pokud WiFi zafungovala). |
 | 🟣 **Fialová svítí 5 s** | Právě byl odeslán alert „GARÁŽ OTEVŘENA". Vidíte jenom během běžné kontroly (každých 5 min), kdy byl alert úspěšně doručen. |
@@ -173,7 +268,7 @@ Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. 
 
 ### Čas ve zprávách
 
-Čas v notifikacích (`Čas: HH:MM`) **nemusí vždy přesně odpovídat skutečnému času** — může být odchýlený o pár minut. Zařízení nemá hodinový krystal pro přesné měření času; používá interní oscilátor a pravidelně si čas synchronizuje přes internet (každých ~10 minut). Pro účely hlídání nočního okna 22:00–06:00 je to dostatečně přesné, drobné odchýlky neovlivňují funkci.
+Čas v notifikacích (`Čas: HH:MM`) **nemusí vždy přesně odpovídat skutečnému času** — může být odchýlený o pár minut. Zařízení nemá hodinový krystal pro přesné měření času; používá interní oscilátor a pravidelně si čas synchronizuje přes internet (každých ~10 minut). Pro účely hlídání nočního okna 22:00–06:00 (nebo dle nastavení) je to dostatečně přesné, drobné odchýlky neovlivňují funkci.
 
 Pokud zařízení ztratilo synchronizaci úplně (např. dlouhý WiFi výpadek, čerstvý cold boot bez internetu), v zprávě uvidíte `Čas: (čas neznámý)`. Alerty fungují i tak — jenom bez timestampu.
 
@@ -226,11 +321,12 @@ Naplánujte nabití do týdne. Při kritickém stavu (<5 %) se zařízení samo 
 
 Zařízení má **vestavěný USB-C konektor + nabíjecí čip**. Nabíjení:
 
-1. Připojte USB-C kabel do zařízení
-2. Druhý konec do jakéhokoliv USB nabíječe (telefonní nabíječka, powerbanka, PC, …)
-3. Indikační LED na desce nabíjení svítí během nabíjení (na samotném ESP modulu, mimo průzor)
-4. Zhasne když je baterie plně nabitá (~2–3 hodiny pro 1000 mAh, ~6 h pro 18650)
-5. Zařízení **může běžet i během nabíjení**, není třeba vypínat
+1. ⚠️ **Spínač musí být v poloze ON** — pokud je vypnutý, baterie je fyzicky odpojená a nabíjet se nebude. (Spínač zapnete → zařízení normálně běží i během nabíjení.)
+2. Připojte USB-C kabel do zařízení
+3. Druhý konec do jakéhokoliv USB nabíječe (telefonní nabíječka, powerbanka, PC, …)
+4. Indikační LED na desce nabíjení svítí během nabíjení (na samotném ESP modulu, mimo průzor)
+5. Zhasne když je baterie plně nabitá (~2–3 hodiny pro 1000 mAh, ~6 h pro 18650)
+6. Zařízení **může běžet i během nabíjení**, není třeba vypínat
 
 **Důležité:** zařízení se po vypnutí/zapnutí spínačem (nebo výměně baterie) chová jako po prvním zapnutí — pošle „Hlidac garazovych vrat aktivni" notifikaci a znovu zachytí referenci polohy vrat.
 
@@ -253,7 +349,7 @@ A: Senzor musí být **pevně přilepený k vratům** (ne na rámu, ne na pohybl
 A: Ano, na všechna, která se naklánějí o víc než 60° při otevření. Sekční (skládací do stropu) typicky 90°, křídlová 90°, rolovací (svisle navíjená) jen ~5–10° — **na rolovací nefunguje**, je třeba jiný senzor.
 
 **Q: Lze zařízení rozšířit o detekci přes den?**
-A: Aktuálně hlídá jen 22:00–06:00. Rozšíření by šlo, ale baterie vydrží míň (víc alertů = víc WiFi = víc energie). Pokud potřeba, dá se firmware upravit.
+A: Aktuálně hlídá jen 22:00–06:00 (nebo dle nastavení v konfiguraci). Rozšíření na 24/7 by šlo, ale baterie vydrží míň (víc alertů = víc WiFi = víc energie). Pokud potřeba, dá se firmware upravit.
 
 **Q: Co když chci notifikaci vypnout (např. legitimně otevírám vrata v noci)?**
 A: Buď vypněte ntfy.sh appku v telefonu před tím, nebo akceptujte alert (přijde každých ~5 min dokud vrata nezavřete). Plánovaný „suppress" mód není.

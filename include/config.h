@@ -18,11 +18,24 @@ constexpr uint8_t  VBAT_ADC_PIN   = 0;
 constexpr float    VBAT_DIVIDER   = 1.769f;
 constexpr uint8_t  LED_BRIGHTNESS = 60;
 
+// External AP trigger — propojka pri startu = AP mode. Pouziti pri power-off
+// uzivateli kterym double-RST nefunguje (power switch = full power cycle,
+// RTC mem vymazana, detekce dvou RST za sebou nemozna).
+//
+// Pouzivame UART0 piny GPIO20 (RX) a GPIO21 (TX) — v app firmwaru nepouzite
+// (Serial = USB-CDC), fyzicky sousedi na headeru → standardni 2-pin jumper.
+// Pred zapnutim spinacem propoj GPIO20 ↔ GPIO21, zapni → AP mode.
+//
+// Pozor: pokud pouzivas dual-log USB-UART adapter pri c3power debug, ten je
+// na techto pinech. Pred triggerovanim AP rezimu odpoj.
+constexpr uint8_t  AP_TRIGGER_PIN_IN  = 20;   // UART0 RX, INPUT_PULLUP — short → AP
+constexpr uint8_t  AP_TRIGGER_PIN_GND = 21;   // UART0 TX, OUTPUT LOW — "fake GND"
+
 // ===== Logicke prahy a casovani =====
-constexpr uint32_t WAKE_INTERVAL_S            = 30;     // 5 min //!!!TODO!!!
+constexpr uint32_t WAKE_INTERVAL_S            = 300;     // 5 min 
 constexpr float    TILT_THRESHOLD_OPEN        = 60.0f;
 constexpr float    TILT_THRESHOLD_CLOSE       = 40.0f;
-constexpr int      NIGHT_START_HOUR           = 10; //!!!TODO!!!
+constexpr int      NIGHT_START_HOUR           = 22; 
 constexpr int      NIGHT_END_HOUR             = 6;
 constexpr int      HEARTBEAT_HOUR             = 21;
 constexpr uint32_t ALERT_RATE_LIMIT_S         = 4 * 60;
@@ -56,7 +69,7 @@ constexpr uint32_t SERIAL_INIT_DELAY_MS       = 300;
 // "going to sleep" / "woke up" hlasky se stale printuji (pro vizualni sanity).
 // Chip nikdy realne nezaspi → spotreba je ~25 mA continuous, jen pro debug u stolu.
 // Pred deploymentem zpet na `true`.
-constexpr bool     DEEP_SLEEP_ENABLED         = false; //!!!TODO!!!
+constexpr bool     DEEP_SLEEP_ENABLED         = true;
 
 // CZ timezone (POSIX format) — automaticky resi CET/CEST DST.
 // Definice v net.cpp (extern aby slo sdilet pres TU).

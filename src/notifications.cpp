@@ -6,6 +6,7 @@
 #include "net.h"
 #include "sensor.h"
 #include "state.h"
+#include "storage.h"
 #include "time_utils.h"
 
 namespace {
@@ -48,7 +49,7 @@ bool send_boot_notification(float vbat, float vbat_pct, int rssi, const Vec3& ba
     "Reference zavřených vrat zachycena.\n"
     "Orientace: %s (%.0f° od horizontály).\n"
     "\n"
-    "Pokud orientace neodpovídá realitě (vrata mají být zevřená při instalaci),\n"
+    "Pokud orientace neodpovídá realitě (vrata mají být zavřená při instalaci),\n"
     "při zavřených vratech zařízení vypnout a zapnout — uloží se nová reference.",
     timestr, vbat_pct, vbat, rssi_bars(rssi), rssi,
     orient, theta);
@@ -79,16 +80,24 @@ bool send_heartbeat(bool door_open, float tilt, float vbat, float vbat_pct, int 
   const char* tag = (vbat_pct > 50) ? "white_check_mark"
                   : (vbat_pct > 20) ? "yellow_circle"
                                     : "battery";
-  char uptime_str[32] = "?";
+  // Uptime: preferuj wall-clock od prvniho NTP syncu (presny). Pokud NTP
+  // nikdy nesyncoval, padni na odhad z boot_count × WAKE_INTERVAL_S (oznacen ~).
+  char uptime_str[40];
+  int64_t elapsed_s = 0;
+  bool from_ntp = false;
   if (state.first_boot_unix > 0) {
     time_t now; time(&now);
-    int64_t elapsed = static_cast<int64_t>(now) - static_cast<int64_t>(state.first_boot_unix);
-    if (elapsed < 0) elapsed = 0;
-    long days  = static_cast<long>(elapsed / 86400);
-    long hours = static_cast<long>((elapsed % 86400) / 3600);
-    long mins  = static_cast<long>((elapsed % 3600) / 60);
-    snprintf(uptime_str, sizeof(uptime_str), "%ldd %ldh %ldm", days, hours, mins);
+    elapsed_s = static_cast<int64_t>(now) - static_cast<int64_t>(state.first_boot_unix);
+    if (elapsed_s < 0) elapsed_s = 0;
+    from_ntp = true;
+  } else {
+    elapsed_s = static_cast<int64_t>(state.boot_count) * cfg.wake_interval_s;
   }
+  long days  = static_cast<long>(elapsed_s / 86400);
+  long hours = static_cast<long>((elapsed_s % 86400) / 3600);
+  long mins  = static_cast<long>((elapsed_s % 3600) / 60);
+  snprintf(uptime_str, sizeof(uptime_str), "%s%ldd %ldh %ldm",
+           from_ntp ? "" : "~", days, hours, mins);
 
   char body[320];
   snprintf(body, sizeof(body),

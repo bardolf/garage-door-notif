@@ -6,8 +6,8 @@
 #include "lwip/dns.h"
 
 #include "config.h"
-#include "secrets.h"
 #include "state.h"
+#include "storage.h"
 
 const char* const TZ_CZ = "CET-1CEST,M3.5.0,M10.5.0/3";
 const char* const NTP_SERVERS[3] = {
@@ -28,8 +28,8 @@ void override_dns_to_public() {
 
 bool wifi_connect() {
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.printf("[wifi] %s ", WIFI_SSID);
+  WiFi.begin(cfg.wifi_ssid, cfg.wifi_pass);
+  Serial.printf("[wifi] %s ", cfg.wifi_ssid);
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && (millis() - start) < WIFI_TIMEOUT_MS) {
     delay(250);
@@ -77,7 +77,7 @@ bool ntp_sync() {
 bool ntfy_send(const char* title, const char* body,
                const char* priority, const char* tags) {
   HTTPClient http;
-  String url = String("http://ntfy.sh/") + NTFY_TOPIC;
+  String url = String("http://ntfy.sh/") + cfg.ntfy_topic;
   http.begin(url);
   http.addHeader("Content-Type", "text/plain; charset=utf-8");
   if (title)    http.addHeader("Title",    title);
