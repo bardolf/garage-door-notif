@@ -105,7 +105,7 @@ Než zařízení namontujete na vrata, otestujte si že detekce funguje. Buď:
 Pokud chcete změnit nastavení (jiná WiFi, jiný topic) nebo zařízení znovu nakonfigurovat:
 
 1. **Vypněte zařízení** spínačem.
-2. **Propojte piny GPIO20 a GPIO21** na headeru (dva sousední piny, dají se zkratovat 2-pin jumperem nebo kouskem drátu).
+2. **Propojte piny RX a TX** na headeru (na silku označené `RX` a `TX`, případně `GPIO20` a `GPIO21` — jsou to dva sousední piny, dají se zkratovat 2-pin jumperem nebo kouskem drátu).
 3. **Zapněte zařízení.**
 4. LED začne **modře blikat trojitě** = AP režim aktivní. Pokračujte krokem 3 výše.
 
@@ -224,7 +224,7 @@ V krabičce je viditelná RGB LED dioda (skrz **průzor ve víku** — viditeln�
 | Barva | Význam |
 |-------|--------|
 | 🔵 **Modrá svítí** | Cold boot právě probíhá (po zapnutí spínače / výměně baterie). Trvá 5–10 s. |
-| 🔵 **Modrá — trojitý blik každé 3 s** | **Konfigurační režim (AP)**. Zařízení vystavilo WiFi „garaz-XXXXXX" a čeká, až se na něj připojíte telefonem a vyplníte formulář. Nastane při prvním zapnutí (prázdná konfigurace) nebo když propojíte piny GPIO20+GPIO21. Trvá až 10 min, pak usne a zkusí znovu při dalším probuzení. Viz [První nastavení](#první-nastavení-instalace) výše. |
+| 🔵 **Modrá — trojitý blik každé 3 s** | **Konfigurační režim (AP)**. Zařízení vystavilo WiFi „garaz-XXXXXX" a čeká, až se na něj připojíte telefonem a vyplníte formulář. Nastane při prvním zapnutí (prázdná konfigurace) nebo když propojíte piny RX+TX (GPIO20+GPIO21). Trvá až 10 min, pak usne a zkusí znovu při dalším probuzení. Viz [První nastavení](#první-nastavení-instalace) výše. |
 | 🟢 **Zelená 5 s svítí + 10 s bliká** | Cold boot proběhl úspěšně. Reference zachycena, WiFi OK, notifikace odeslána. Bliká během 10s okna pro nahrávání nového firmware (technické). |
 | 🔴 **Červená 5 s svítí + 10 s bliká** | Cold boot selhal — typicky chybí WiFi, nepodařilo se zachytit referenci nebo senzor nereaguje. Měla by dorazit i CHYBA notifikace (pokud WiFi zafungovala). |
 | 🟣 **Fialová svítí 5 s** | Právě byl odeslán alert „GARÁŽ OTEVŘENA". Vidíte jenom během běžné kontroly (každých 5 min), kdy byl alert úspěšně doručen. |
@@ -275,7 +275,12 @@ Pokud se zhorší, můžete zvážit lepší pozici routeru nebo WiFi extender. 
 
 ### Čas ve zprávách
 
-Čas v notifikacích (`Čas: HH:MM`) **nemusí vždy přesně odpovídat skutečnému času** — může být odchýlený o pár minut. Zařízení nemá hodinový krystal pro přesné měření času; používá interní oscilátor a pravidelně si čas synchronizuje přes internet (každých ~10 minut). Pro účely hlídání nočního okna 22:00–06:00 (nebo dle nastavení) je to dostatečně přesné, drobné odchýlky neovlivňují funkci.
+Čas v notifikacích (`Čas: HH:MM`) **nemusí vždy přesně odpovídat skutečnému času** — může být odchýlený o pár minut. Zařízení nemá hodinový krystal pro přesné měření času; používá interní oscilátor, který drifuje (typicky ~1 s za hodinu = ~24 s za den). Synchronizace přes internet:
+
+- **Vynucená**: minimálně jednou za 24 h
+- **Příležitostná**: kdykoli zařízení připojí WiFi z jiného důvodu (alert, heartbeat, chybové hlášení) a od posledního syncu uplynulo ≥ 10 min — sync proběhne při té příležitosti zdarma
+
+V typický den se sync provede aspoň při heartbeatu (21:00), takže drift mezi syncy nepřesáhne ~30 s. Pro účely hlídání nočního okna 22:00–06:00 (nebo dle nastavení) je to dostatečně přesné, drobné odchýlky neovlivňují funkci.
 
 Pokud zařízení ztratilo synchronizaci úplně (např. dlouhý WiFi výpadek, čerstvý cold boot bez internetu), v zprávě uvidíte `Čas: (čas neznámý)`. Alerty fungují i tak — jenom bez timestampu.
 
