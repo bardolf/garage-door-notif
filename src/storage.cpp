@@ -38,6 +38,14 @@ void cfg_load() {
 
   p.end();
 
+  // Sanity: torn write (power lost mezi putString a putBool) by mohl nechat
+  // configured=true s prazdnymi creds → infinite WiFi-fail loop. Defenzivni
+  // check vraci nas do AP modu, kde uzivatel doplni co chybi.
+  if (cfg.configured && (cfg.wifi_ssid[0] == '\0' || cfg.ntfy_topic[0] == '\0')) {
+    Serial.println(F("[cfg] WARN: configured=true ale nekompletni data → forcing AP mode"));
+    cfg.configured = false;
+  }
+
   Serial.println(F("[cfg] ===== active configuration ====="));
   Serial.printf( "[cfg] configured:    %s\n", cfg.configured ? "yes" : "NO (AP mode bude)");
   Serial.printf( "[cfg] WiFi SSID:     %s\n", cfg.wifi_ssid);

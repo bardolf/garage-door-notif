@@ -67,6 +67,9 @@ bool ntp_sync() {
   time_t t_before;
   time(&t_before);
 
+  // sntp_init() je no-op pokud daemon uz bezi → fresh dotaz by se neposlal.
+  // sntp_stop() vynuti restart pri dalsim configTzTime → posila novou query.
+  sntp_stop();
   sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
   configTzTime(TZ_CZ, NTP_SERVERS[0], NTP_SERVERS[1], NTP_SERVERS[2]);
 

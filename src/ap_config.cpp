@@ -65,11 +65,12 @@ String html_escape(const String& s) {
   for (size_t i = 0; i < s.length(); i++) {
     char c = s[i];
     switch (c) {
-      case '<': out += "&lt;"; break;
-      case '>': out += "&gt;"; break;
-      case '&': out += "&amp;"; break;
-      case '"': out += "&quot;"; break;
-      default:  out += c;
+      case '<':  out += "&lt;";   break;
+      case '>':  out += "&gt;";   break;
+      case '&':  out += "&amp;";  break;
+      case '"':  out += "&quot;"; break;
+      case '\'': out += "&#39;";  break;   // attributes pouzivame s ' delimitery
+      default:   out += c;
     }
   }
   return out;
@@ -111,7 +112,11 @@ String build_form_html(const String& wifi_scan_options, const String& status_msg
   h += F("<div class=hint>Pokud chybí, zkus znova načíst stránku.</div>");
 
   h += F("<label>Heslo WiFi</label>");
-  h += F("<input name=wifi_pass type=password autocomplete=off>");
+  h += F("<input id=pwd name=wifi_pass type=password autocomplete=off>");
+  h += F("<label style='font-weight:normal;color:#555;cursor:pointer'>");
+  h += F("<input type=checkbox style='width:auto;margin-right:.4em;vertical-align:middle' ");
+  h += F("onclick=\"var p=document.getElementById('pwd');p.type=this.checked?'text':'password'\"> ");
+  h += F("Zobrazit heslo</label>");
 
   h += F("<label>ntfy.sh topic</label>");
   h += F("<input name=ntfy_topic value='");
@@ -217,13 +222,36 @@ void handle_save() {
   Serial.printf("[ap] form submit: ssid='%s' topic='%s' wake=%us\n",
                 ssid.c_str(), topic.c_str(), wake_int);
 
-  // Validace
+  // Validace — povinna pole + delky podle WiFi standard a NVS buffer.
+  // Bez delkove kontroly by se strncpy tise zkratil, ale test_wifi_connect by
+  // pracoval s plnou stringou → save by ulozil jine heslo nez to testovane,
+  // priste boot by failoval s "spatne heslo".
+  String err;
   if (ssid.length() == 0 || pass.length() == 0 || topic.length() == 0) {
-    String err = F("<div class=msg style='background:#ffe0e0;border:1px solid #c00;padding:.6em'>Vyplň SSID, heslo i ntfy topic.</div>");
-    server.send(400, "text/html; charset=utf-8", build_form_html(wifi_scan_html(), err));
+    err = F("Vyplň SSID, heslo i ntfy topic.");
+  } else if (ssid.length() > 32) {
+    err = F("SSID je delší než 32 znaků (WiFi limit).");
+  } else if (pass.length() > 63) {
+    err = F("Heslo je delší než 63 znaků (WPA2 limit).");
+  } else if (topic.length() > CFG_STR_MAX - 1) {
+    err = F("Topic je příliš dlouhý.");
+  } else if (dev_name.length() > CFG_STR_MAX - 1) {
+    err = F("Název zařízení je příliš dlouhý.");
+  }
+  // Clamp numericke fieldy (HTML min/max je jen client-side, server-side prepis)
+  if (night_st < 0 || night_st > 23) night_st = 22;
+  if (night_en < 0 || night_en > 23) night_en = 6;
+  if (hb_hr   < 0 || hb_hr   > 23) hb_hr   = 21;
+  if (wake_int < 10)    wake_int = 10;
+  if (wake_int > 3600)  wake_int = 3600;
+
+  if (err.length() > 0) {
+    String msg = F("<div class=msg err>");
+    msg += err;
+    msg += F("</div>");
+    server.send(400, "text/html; charset=utf-8", build_form_html(wifi_scan_html(), msg));
     return;
   }
-  if (wake_int < 10) wake_int = 10;
 
   // Test connect (nezavisly na AP)
   if (!test_wifi_connect(ssid.c_str(), pass.c_str())) {
