@@ -96,7 +96,7 @@ esp_support_dx_from_mount  = 26.0;  // X dist from ESP mount hole (toward USB-C)
 // ESP lid pressure pin: ZRUSENO — kolidoval by s rocker switch v -X stene.
 
 // ===== LED viewing hole in lid (NeoPixel on ESP module shines through) =====
-led_hole_dia              = 4.0;   // priezor pro indikacni RGB LED
+led_hole_dia              = 6.0;   // priezor pro indikacni RGB LED
 led_x_from_mount          = 18.0;  // X dist from ESP mount-hole line (toward USB-C) — MEASURED
 led_y_from_pcb_inner_edge = 6.0;   // Y dist from ESP PCB edge nearest to battery — MEASURED
 

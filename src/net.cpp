@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <time.h>
 #include "lwip/dns.h"
+#include "esp_sntp.h"
 
 #include "config.h"
 #include "state.h"
@@ -53,24 +54,39 @@ void wifi_disconnect() {
 
 bool ntp_sync() {
   Serial.print(F("[ntp] sync ... "));
+
+  // Bug-fix: puvodni kod cekal na "time() > NTP_VALID_EPOCH_THRESHOLD",
+  // ale system time po prvnim ever syncu drzi platnou hodnotu pres deep sleep
+  // (RTC chip ji uchovava), takze druhe a dalsi volani ntp_sync() okamzite
+  // vraceli true BEZ skutecneho sit'oveho dotazu → chip-only drift (typicky
+  // 150-200 ppm = ~7 min/mesic) se nikdy nekorigoval.
+  //
+  // Resi se to explicitnim reset SNTP status flagu pred re-initem. Pak cekame
+  // na SNTP_SYNC_STATUS_COMPLETED, coz se set-uje az v SNTP callbacku po prijati
+  // realne odpovedi ze serveru.
+  time_t t_before;
+  time(&t_before);
+
+  sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
   configTzTime(TZ_CZ, NTP_SERVERS[0], NTP_SERVERS[1], NTP_SERVERS[2]);
+
   uint32_t start = millis();
-  time_t now = 0;
   while ((millis() - start) < NTP_TIMEOUT_MS) {
-    time(&now);
-    if (now > NTP_VALID_EPOCH_THRESHOLD) {
+    if (sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED) {
+      time_t now; time(&now);
       char buf[32];
       struct tm tm_local;
       localtime_r(&now, &tm_local);
       strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", &tm_local);
-      Serial.printf("OK -> %s\n", buf);
+      long delta = static_cast<long>(static_cast<int64_t>(now) - static_cast<int64_t>(t_before));
+      Serial.printf("OK -> %s (delta vs chip clock: %+ld s)\n", buf, delta);
       state.last_ntp_unix = now;
       if (state.first_boot_unix == 0) state.first_boot_unix = static_cast<uint64_t>(now);
       return true;
     }
     delay(200);
   }
-  Serial.println(F("TIMEOUT"));
+  Serial.println(F("TIMEOUT (sntp_get_sync_status != COMPLETED)"));
   return false;
 }
 
